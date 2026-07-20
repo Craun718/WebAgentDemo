@@ -1,17 +1,32 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
 import { useHealthStore } from "../stores/health";
+import { useAuthStore } from "../stores/auth";
+import { useRouter } from "vue-router";
 
 const health = useHealthStore();
+const auth = useAuthStore();
+const router = useRouter();
 
 onMounted(() => {
   void health.fetchHealth();
+  void auth.fetchNow();
 });
+
+function handleLogout() {
+  auth.logout();
+  void router.push("/login");
+}
 </script>
 
 <template>
   <main class="wrap">
-    <h1>Web Agent</h1>
+    <header class="header">
+      <h1>Web Agent</h1>
+      <button type="button" class="logout-btn" @click="handleLogout">
+        Logout
+      </button>
+    </header>
     <section class="card">
       <h2>Backend health</h2>
       <p v-if="health.loading" class="muted">Checking…</p>
@@ -28,6 +43,14 @@ onMounted(() => {
       </dl>
       <button type="button" @click="health.fetchHealth()">Refresh</button>
     </section>
+
+    <section class="card" style="margin-top: 16px">
+      <h2>Server time</h2>
+      <p v-if="auth.serverTime" class="time">
+        {{ auth.serverTime }}
+      </p>
+      <p v-else class="muted">Fetching…</p>
+    </section>
   </main>
 </template>
 
@@ -38,9 +61,31 @@ onMounted(() => {
   padding: 48px 24px;
 }
 
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
 h1 {
   font-size: 2rem;
-  margin-bottom: 24px;
+  margin: 0;
+}
+
+.logout-btn {
+  background: none;
+  border: 1px solid #2a2f3a;
+  border-radius: 8px;
+  color: var(--muted);
+  padding: 8px 16px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.logout-btn:hover {
+  color: var(--fg);
+  border-color: var(--fg);
 }
 
 .card {
@@ -74,6 +119,11 @@ dd {
 
 .err {
   color: #fca5a5;
+}
+
+.time {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 button {
