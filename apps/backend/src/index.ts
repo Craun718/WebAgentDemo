@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
+import { accessLogger } from "./logger";
 import crypto from "node:crypto";
 import type { LoginRequest, LoginResponse, NowResponse } from "@web-agent/shared";
 import { SERVICE_NAME, buildHealthResponse } from "@web-agent/shared";
@@ -10,6 +11,8 @@ const ADMIN_PASSWORD = "admin";
 const validTokens = new Set<string>();
 
 const app = new Hono();
+
+app.use("*", accessLogger);
 
 app.get("/api/health", (c) => {
   return c.json(buildHealthResponse(SERVICE_NAME));
