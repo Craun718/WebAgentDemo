@@ -1,0 +1,6 @@
+$schema: "https://moonrepo.dev/schemas/toolchain.json"
+
+node:
+  version: "26.2.0"
+  packageManager: "pnpm"
+  syncProjectWorkspaceDependencies: true

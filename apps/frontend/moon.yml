@@ -1,0 +1,27 @@
+language: "typescript"
+project:
+  type: "application"
+  platform: "browser"
+
+dependsOn:
+  - shared
+
+tasks:
+  dev:
+    command: "vite"
+  build:
+    script: "vue-tsc --noEmit && vite build"
+    outputs:
+      - "dist/**/*"
+  typecheck:
+    command: "vue-tsc --noEmit"
+    options:
+      affectedFiles: true
+  test:
+    command: "vitest run"
+    options:
+      affectedFiles: true
+  lint:
+    command: "oxlint ."
+    options:
+      affectedFiles: true

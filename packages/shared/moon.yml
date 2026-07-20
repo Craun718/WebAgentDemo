@@ -1,0 +1,13 @@
+language: "typescript"
+project:
+  type: "library"
+
+tasks:
+  typecheck:
+    command: "tsc --noEmit"
+    options:
+      affectedFiles: true
+  test:
+    command: "vitest run"
+    options:
+      affectedFiles: true
