@@ -1,5 +1,13 @@
 import type { Context } from "hono";
 import { streamSSE } from "hono/streaming";
+import OpenAI from "openai";
+import type { Stream } from "openai/core/streaming";
+import type {
+    ChatCompletion,
+    ChatCompletionChunk,
+    ChatCompletionCreateParamsNonStreaming,
+    ChatCompletionCreateParamsStreaming,
+} from "openai/resources/chat/completions";
 import type { ChatMessage, ChatRequest } from "@web-agent/shared";
 
 // Provider config (OpenAI-compatible). DeepSeek by default per backend/.env.
@@ -20,35 +28,84 @@ export function resolveModel(model?: string): string {
     return model?.trim() || (process.env.MODEL ?? "deepseek-v4-flash");
 }
 
-/** Upstream completions URL, e.g. https://api.deepseek.com/chat/completions. */
-export function chatCompletionsUrl(): string {
-    return `${baseUrl()}/chat/completions`;
-}
-
-/** Headers sent to the upstream provider, including the secret API key. */
-export function buildUpstreamHeaders(): Record<string, string> {
-    return {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey()}`,
-    };
-}
-
-/** Build the OpenAI-compatible request body forwarded upstream. */
-export function buildUpstreamBody(req: ChatRequest, model: string): string {
-    return JSON.stringify({
-        model,
-        messages: req.messages,
-        stream: req.stream ?? false,
+/** Create an OpenAI-compatible SDK client for the configured provider. */
+export function createOpenAIClient(): OpenAI {
+    return new OpenAI({
+        apiKey: apiKey(),
+        baseURL: baseUrl(),
     });
 }
 
-function isMessage(value: unknown): value is ChatMessage {
-    if (typeof value !== "object" || value === null) return false;
-    const { role, content } = value as Record<string, unknown>;
+export function buildChatCompletionParams(
+    req: ChatRequest,
+    model: string,
+    stream: true,
+): ChatCompletionCreateParamsStreaming;
+export function buildChatCompletionParams(
+    req: ChatRequest,
+    model: string,
+    stream: false,
+): ChatCompletionCreateParamsNonStreaming;
+export function buildChatCompletionParams(
+    req: ChatRequest,
+    model: string,
+    stream: boolean,
+): ChatCompletionCreateParamsStreaming | ChatCompletionCreateParamsNonStreaming {
+    return stream
+        ? {
+              model,
+              messages: req.messages,
+              stream: true,
+          }
+        : {
+              model,
+              messages: req.messages,
+              stream: false,
+          };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
+}
+
+function isChatContent(value: unknown): boolean {
+    return value === null || typeof value === "string" || Array.isArray(value);
+}
+
+function hasSupportedRole(role: unknown): role is ChatMessage["role"] {
     return (
-        (role === "system" || role === "user" || role === "assistant") &&
-        typeof content === "string"
+        role === "developer" ||
+        role === "system" ||
+        role === "user" ||
+        role === "assistant" ||
+        role === "tool" ||
+        role === "function"
     );
+}
+
+function isMessage(value: unknown): value is ChatMessage {
+    if (!isRecord(value) || !hasSupportedRole(value.role)) return false;
+
+    if (value.role === "assistant") {
+        const hasPayload =
+            value.content !== undefined ||
+            Array.isArray(value.tool_calls) ||
+            isRecord(value.function_call);
+        return (
+            hasPayload &&
+            (value.content === undefined || isChatContent(value.content))
+        );
+    }
+
+    if (value.role === "tool") {
+        return typeof value.tool_call_id === "string" && isChatContent(value.content);
+    }
+
+    if (value.role === "function") {
+        return typeof value.name === "string" && isChatContent(value.content);
+    }
+
+    return "content" in value && isChatContent(value.content);
 }
 
 function badRequest(c: Context, message: string) {
@@ -85,85 +142,57 @@ export async function chatHandler(c: Context) {
     ) {
         return badRequest(
             c,
-            "messages must be a non-empty array of { role, content }",
+            "messages must be a non-empty OpenAI-compatible chat message array",
         );
     }
 
     const model = resolveModel(body.model);
     const wantsStream = body.stream === true;
+    const client = createOpenAIClient();
 
-    let upstream: Response;
-    try {
-        upstream = await fetch(chatCompletionsUrl(), {
-            method: "POST",
-            headers: buildUpstreamHeaders(),
-            body: buildUpstreamBody({ ...body, stream: wantsStream }, model),
+    if (wantsStream) {
+        let completionStream: Stream<ChatCompletionChunk>;
+        try {
+            completionStream = await client.chat.completions.create(
+                buildChatCompletionParams(body, model, true),
+            );
+        } catch (err) {
+            console.error("[chat] upstream request failed:", err);
+            return c.json(
+                { success: false, message: "Failed to reach model provider" },
+                502,
+            );
+        }
+
+        return streamSSE(c, async (stream) => {
+            try {
+                for await (const chunk of completionStream) {
+                    if (stream.aborted) break;
+                    await stream.writeSSE({ data: JSON.stringify(chunk) });
+                }
+                if (!stream.aborted) {
+                    await stream.writeSSE({ data: "[DONE]" });
+                }
+            } catch (err) {
+                if (!stream.aborted) console.error("[chat] stream error:", err);
+            } finally {
+                completionStream.controller.abort();
+            }
         });
+    }
+
+    let completion: ChatCompletion;
+    try {
+        completion = await client.chat.completions.create(
+            buildChatCompletionParams(body, model, false),
+        );
     } catch (err) {
-        console.error("[chat] upstream fetch failed:", err);
+        console.error("[chat] upstream request failed:", err);
         return c.json(
             { success: false, message: "Failed to reach model provider" },
             502,
         );
     }
 
-    if (!upstream.ok || !upstream.body) {
-        const detail = await upstream.text().catch(() => "");
-        console.error(
-            `[chat] upstream error ${upstream.status}:`,
-            detail.slice(0, 500),
-        );
-        return c.json(
-            {
-                success: false,
-                message: `Model provider returned ${upstream.status}`,
-            },
-            upstream.status === 429 ? 429 : 502,
-        );
-    }
-
-    if (wantsStream) {
-        return streamSSE(c, async (stream) => {
-            const reader = upstream.body!.getReader();
-            const decoder = new TextDecoder();
-            let buffer = "";
-            try {
-                while (!stream.aborted) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    buffer += decoder.decode(value, { stream: true });
-                    // SSE events are separated by a blank line.
-                    const events = buffer.split("\n\n");
-                    buffer = events.pop() ?? "";
-                    for (const event of events) {
-                        for (const line of event.split("\n")) {
-                            if (!line.startsWith("data:")) continue;
-                            await stream.writeSSE({
-                                data: line.slice(5).trimStart(),
-                            });
-                        }
-                    }
-                }
-                // Flush any trailing event left in the buffer.
-                for (const line of buffer.split("\n")) {
-                    if (line.startsWith("data:")) {
-                        await stream.writeSSE({
-                            data: line.slice(5).trimStart(),
-                        });
-                    }
-                }
-            } catch (err) {
-                if (!stream.aborted) console.error("[chat] stream error:", err);
-            } finally {
-                await reader.cancel().catch(() => {});
-            }
-        });
-    }
-
-    // Non-streaming: forward the JSON body verbatim.
-    const text = await upstream.text();
-    return c.body(text, 200, {
-        "content-type":
-            upstream.headers.get("content-type") ?? "application/json",
-    });
+    return c.json(completion);
 }

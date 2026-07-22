@@ -1,10 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import {
-    buildUpstreamBody,
-    buildUpstreamHeaders,
-    chatCompletionsUrl,
-    resolveModel,
-} from "./chat";
+import { buildChatCompletionParams, createOpenAIClient, resolveModel } from "./chat";
 import type { ChatRequest } from "@web-agent/shared";
 
 const originalEnv = { ...process.env };
@@ -33,50 +28,39 @@ describe("resolveModel", () => {
     });
 });
 
-describe("chatCompletionsUrl", () => {
-    it("builds the completions path from BASE_URL", () => {
-        process.env.BASE_URL = "https://api.deepseek.com";
-        expect(chatCompletionsUrl()).toBe(
-            "https://api.deepseek.com/chat/completions",
-        );
-    });
-
-    it("strips trailing slashes from BASE_URL", () => {
-        process.env.BASE_URL = "https://api.deepseek.com/v1/";
-        expect(chatCompletionsUrl()).toBe(
-            "https://api.deepseek.com/v1/chat/completions",
-        );
-    });
-});
-
-describe("buildUpstreamHeaders", () => {
-    it("includes the bearer API key", () => {
+describe("createOpenAIClient", () => {
+    it("uses the configured OpenAI-compatible base URL", () => {
         process.env.API_KEY = "sk-test-key";
-        const headers = buildUpstreamHeaders();
-        expect(headers["Authorization"]).toBe("Bearer sk-test-key");
-        expect(headers["Content-Type"]).toBe("application/json");
+        process.env.BASE_URL = "https://api.deepseek.com/v1/";
+        const client = createOpenAIClient();
+
+        expect(client.baseURL).toBe("https://api.deepseek.com/v1");
     });
 });
 
-describe("buildUpstreamBody", () => {
-    it("serializes model, messages and the stream flag", () => {
+describe("buildChatCompletionParams", () => {
+    it("builds streaming chat completions params", () => {
         const req: ChatRequest = {
             messages: [{ role: "user", content: "hi" }],
             stream: true,
         };
-        const parsed = JSON.parse(buildUpstreamBody(req, "deepseek-chat"));
-        expect(parsed).toEqual({
+
+        expect(buildChatCompletionParams(req, "deepseek-chat", true)).toEqual({
             model: "deepseek-chat",
             messages: [{ role: "user", content: "hi" }],
             stream: true,
         });
     });
 
-    it("defaults stream to false when omitted", () => {
+    it("builds non-streaming chat completions params", () => {
         const req: ChatRequest = {
             messages: [{ role: "user", content: "hi" }],
         };
-        const parsed = JSON.parse(buildUpstreamBody(req, "deepseek-chat"));
-        expect(parsed.stream).toBe(false);
+
+        expect(buildChatCompletionParams(req, "deepseek-chat", false)).toEqual({
+            model: "deepseek-chat",
+            messages: [{ role: "user", content: "hi" }],
+            stream: false,
+        });
     });
 });

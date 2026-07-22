@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from "vue";
-import { useChatStore } from "../stores/chat";
+import { chatMessageContentToText, useChatStore } from "../stores/chat";
 
 const chat = useChatStore();
 const listEl = ref<HTMLDivElement | null>(null);
@@ -12,7 +12,7 @@ async function scrollToBottom() {
 
 watch(() => chat.messages.length, scrollToBottom);
 watch(
-  () => chat.messages.at(-1)?.content,
+  () => chatMessageContentToText(chat.messages.at(-1)),
   scrollToBottom,
 );
 
@@ -49,7 +49,7 @@ function onStop() {
         :class="msg.role"
       >
         <span class="role">{{ msg.role }}</span>
-        <p class="text">{{ msg.content }}</p>
+        <p class="text">{{ chatMessageContentToText(msg) }}</p>
       </div>
     </div>
 

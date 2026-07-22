@@ -10,6 +10,24 @@ interface ChatState {
   error: string | null;
 }
 
+export function chatMessageContentToText(message: ChatMessage | undefined): string {
+  const content = message?.content;
+  if (!content) return "";
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+
+  return content
+    .map((part) => {
+      if (typeof part !== "object" || part === null) return "";
+      if ("text" in part && typeof part.text === "string") return part.text;
+      if ("refusal" in part && typeof part.refusal === "string") {
+        return part.refusal;
+      }
+      return "";
+    })
+    .join("");
+}
+
 // Controller for the in-flight request; lets the user stop generation.
 let activeController: AbortController | null = null;
 
@@ -37,10 +55,10 @@ export const useChatStore = defineStore("chat", {
       this.error = null;
 
       const getAssistantContent = () =>
-        this.messages[assistantIndex]?.content ?? "";
+        chatMessageContentToText(this.messages[assistantIndex]);
       const setAssistantContent = (nextContent: string) => {
         const current = this.messages[assistantIndex];
-        if (!current) return;
+        if (!current || current.role !== "assistant") return;
         this.messages[assistantIndex] = {
           ...current,
           content: nextContent,

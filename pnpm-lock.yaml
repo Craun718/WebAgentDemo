@@ -32,6 +32,9 @@ importers:
       hono:
         specifier: ^4.12.31
         version: 4.12.31
+      openai:
+        specifier: ^6.48.0
+        version: 6.48.0
     devDependencies:
       '@types/node':
         specifier: ^22.10.0
@@ -77,7 +80,11 @@ importers:
         specifier: ^2.2.0
         version: 2.2.0(typescript@5.9.2)
 
-  packages/shared: {}
+  packages/shared:
+    dependencies:
+      openai:
+        specifier: ^6.48.0
+        version: 6.48.0
 
 packages:
 
@@ -1323,6 +1330,26 @@ packages:
   obug@2.1.4:
     resolution: {integrity: sha512-4a+OsYv9UktOJKE+l1A4OufDgdRF9PifWj+tJnHURo/P+WOxpG4GzUFL9qCalmWauao6ogiG+QvnCovwPoyAWA==}
     engines: {node: '>=12.20.0'}
+
+  openai@6.48.0:
+    resolution: {integrity: sha512-KhVp+FyV50QrXNextvL9hIU5l6ox5HYuKQjGVk7lIqprgJol90+dQXWONV6S1lRWsKA1bXjrow8RsUT14M1hNA==}
+    peerDependencies:
+      '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
+      '@smithy/hash-node': '>=4.3.0 <5'
+      '@smithy/signature-v4': '>=5.4.0 <6'
+      ws: ^8.18.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      '@aws-sdk/credential-provider-node':
+        optional: true
+      '@smithy/hash-node':
+        optional: true
+      '@smithy/signature-v4':
+        optional: true
+      ws:
+        optional: true
+      zod:
+        optional: true
 
   oxlint@1.74.0:
     resolution: {integrity: sha512-odGl2s2x5IOJoj3A0v1k0PGBXVFBZeZ2+AK/+K2MJur7Ghi3bkyX5NuLUWHKqa4js1wjep3hJeuTQJOlr+4+dA==}
@@ -2652,6 +2679,8 @@ snapshots:
   object-assign@4.1.1: {}
 
   obug@2.1.4: {}
+
+  openai@6.48.0: {}
 
   oxlint@1.74.0:
     optionalDependencies:

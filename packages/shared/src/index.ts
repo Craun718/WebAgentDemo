@@ -1,5 +1,10 @@
 // Shared domain types consumed by both backend and frontend via workspace symlink.
 
+import type {
+  ChatCompletionChunk as OpenAIChatCompletionChunk,
+  ChatCompletionMessageParam,
+} from "openai/resources/chat/completions";
+
 export interface HealthResponse {
   status: "ok";
   service: string;
@@ -39,28 +44,11 @@ export interface NowResponse {
 
 // --- Chat ---
 
-export type ChatRole = "system" | "user" | "assistant";
-
-export interface ChatMessage {
-  role: ChatRole;
-  content: string;
-}
+export type ChatMessage = ChatCompletionMessageParam;
+export type ChatCompletionChunk = OpenAIChatCompletionChunk;
 
 export interface ChatRequest {
   messages: ChatMessage[];
   stream?: boolean;
   model?: string;
-}
-
-// OpenAI-compatible (DeepSeek) streaming chunk the proxy forwards as SSE.
-export interface ChatCompletionChunkChoice {
-  index: number;
-  delta: { role?: ChatRole; content?: string };
-  finish_reason: string | null;
-}
-
-export interface ChatCompletionChunk {
-  id: string;
-  model: string;
-  choices: ChatCompletionChunkChoice[];
 }
