@@ -36,3 +36,31 @@ export type LoginResponse = LoginSuccess | LoginFailure;
 export interface NowResponse {
   time: string;
 }
+
+// --- Chat ---
+
+export type ChatRole = "system" | "user" | "assistant";
+
+export interface ChatMessage {
+  role: ChatRole;
+  content: string;
+}
+
+export interface ChatRequest {
+  messages: ChatMessage[];
+  stream?: boolean;
+  model?: string;
+}
+
+// OpenAI-compatible (DeepSeek) streaming chunk the proxy forwards as SSE.
+export interface ChatCompletionChunkChoice {
+  index: number;
+  delta: { role?: ChatRole; content?: string };
+  finish_reason: string | null;
+}
+
+export interface ChatCompletionChunk {
+  id: string;
+  model: string;
+  choices: ChatCompletionChunkChoice[];
+}

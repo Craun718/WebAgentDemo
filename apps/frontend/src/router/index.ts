@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Home from "../views/Home.vue";
+import Chat from "../views/Chat.vue";
 import Login from "../views/Login.vue";
 
 export const router = createRouter({
@@ -9,6 +10,11 @@ export const router = createRouter({
       path: "/",
       name: "home",
       component: Home,
+    },
+    {
+      path: "/chat",
+      name: "chat",
+      component: Chat,
     },
     {
       path: "/login",

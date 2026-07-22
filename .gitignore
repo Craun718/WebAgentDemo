@@ -21,8 +21,13 @@ pnpm-debug.log*
 !.vscode/extensions.json
 *.tsbuildinfo
 
+# secrets (e.g. backend/.env with the upstream API key)
+.env
+.env.*
+
 # test coverage
 coverage/
 
 # vite
 .vite/
+.pnpm-store/v11/index.db

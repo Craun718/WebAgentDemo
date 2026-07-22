@@ -2,7 +2,7 @@
 import { onMounted } from "vue";
 import { useHealthStore } from "../stores/health";
 import { useAuthStore } from "../stores/auth";
-import { useRouter } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 
 const health = useHealthStore();
 const auth = useAuthStore();
@@ -23,9 +23,12 @@ function handleLogout() {
   <main class="wrap">
     <header class="header">
       <h1>Web Agent</h1>
-      <button type="button" class="logout-btn" @click="handleLogout">
-        Logout
-      </button>
+      <nav class="header-actions">
+        <RouterLink to="/chat" class="nav-link">Chat</RouterLink>
+        <button type="button" class="logout-btn" @click="handleLogout">
+          Logout
+        </button>
+      </nav>
     </header>
     <section class="card">
       <h2>Backend health</h2>
@@ -81,6 +84,25 @@ h1 {
   padding: 8px 16px;
   font: inherit;
   cursor: pointer;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-link {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.nav-link:hover {
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .logout-btn:hover {

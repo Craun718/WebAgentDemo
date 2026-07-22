@@ -45,6 +45,9 @@ importers:
 
   apps/frontend:
     dependencies:
+      '@microsoft/fetch-event-source':
+        specifier: ^2.0.1
+        version: 2.0.1
       '@web-agent/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -480,6 +483,9 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
+  '@microsoft/fetch-event-source@2.0.1':
+    resolution: {integrity: sha512-W6CLUJ2eBMw3Rec70qrsEW0jOm/3twwJv21mrmj2yORiaVmVYGS4sSS5yUwvQc1ZlDLYGPnClVWmUUMagKNsfA==}
+
   '@moonrepo/cli@2.4.5':
     resolution: {integrity: sha512-AYdIBRpdTwhzfDgGcFzHexiIMEDxiQoUUmlwcajA64NaLglFM3D4pRv5ZmbR1cK+qMm+szwYCK6lnFJ1l57hOw==}
     hasBin: true
@@ -495,6 +501,12 @@ packages:
     cpu: [x64]
     os: [linux]
     libc: [glibc]
+
+  '@moonrepo/core-linux-x64-musl@2.4.5':
+    resolution: {integrity: sha512-ocJQvGay5A47pxnM+gY9u//UQWHuLVh1h+mQwOU6gFIY49vyJvPuth6e7Tz3kxnnzTE7Fq1N7AbUV5XpN59JTA==}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
 
   '@moonrepo/core-macos-arm64@2.4.5':
     resolution: {integrity: sha512-D4EBmxvISKzeR42wzLFfU9Kl0Eg3f8XDxRo9IdQn7cwFx3s4IMhEdoIm0MWmy9w9hYvRCwNIDTZT7U+fuFqOVg==}
@@ -1958,12 +1970,15 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.4.14
 
+  '@microsoft/fetch-event-source@2.0.1': {}
+
   '@moonrepo/cli@2.4.5':
     dependencies:
       detect-libc: 2.1.2
     optionalDependencies:
       '@moonrepo/core-linux-arm64-musl': 2.4.5
       '@moonrepo/core-linux-x64-gnu': 2.4.5
+      '@moonrepo/core-linux-x64-musl': 2.4.5
       '@moonrepo/core-macos-arm64': 2.4.5
       '@moonrepo/core-macos-x64': 2.4.5
       '@moonrepo/core-windows-x64-msvc': 2.4.5
@@ -1972,6 +1987,9 @@ snapshots:
     optional: true
 
   '@moonrepo/core-linux-x64-gnu@2.4.5':
+    optional: true
+
+  '@moonrepo/core-linux-x64-musl@2.4.5':
     optional: true
 
   '@moonrepo/core-macos-arm64@2.4.5':
