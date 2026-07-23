@@ -100,54 +100,61 @@ async function handleLogin() {
             <div class="left-panel"></div>
             <div class="right-panel">
                 <div class="chat-inner">
-                <header class="chat-header">
-                    <h2>Chat</h2>
-                    <button
-                        type="button"
-                        class="ghost"
-                        :disabled="chat.streaming"
-                        @click="onClear"
-                    >
-                        Clear
-                    </button>
-                </header>
+                    <header class="chat-header">
+                        <h2>Chat</h2>
+                        <button
+                            type="button"
+                            class="ghost"
+                            :disabled="chat.streaming"
+                            @click="onClear"
+                        >
+                            Clear
+                        </button>
+                    </header>
 
-                <div ref="listEl" class="messages">
-                    <p v-if="!chat.messages.length" class="empty">
-                        Send a message to start the conversation.
-                    </p>
-                    <div
-                        v-for="(msg, i) in chat.messages"
-                        :key="i"
-                        class="bubble"
-                        :class="msg.role"
-                    >
-                        <span class="role">{{ msg.role }}</span>
-                        <p class="text">{{ chatMessageContentToText(msg) }}</p>
+                    <div ref="listEl" class="messages">
+                        <p v-if="!chat.messages.length" class="empty">
+                            Send a message to start the conversation.
+                        </p>
+                        <div
+                            v-for="(msg, i) in chat.messages"
+                            :key="i"
+                            class="bubble"
+                            :class="msg.role"
+                        >
+                            <span class="role">{{ msg.role }}</span>
+                            <p class="text">
+                                {{ chatMessageContentToText(msg) }}
+                            </p>
+                        </div>
                     </div>
-                </div>
 
-                <p v-if="chat.error" class="error">{{ chat.error }}</p>
+                    <p v-if="chat.error" class="error">{{ chat.error }}</p>
 
-                <form class="composer" @submit.prevent="onSubmit">
-                    <textarea
-                        v-model="chat.input"
-                        placeholder="Type a message…"
-                        rows="1"
-                        :disabled="chat.streaming"
-                        @keydown.enter.exact.prevent="onSubmit"
-                    />
-                    <button
-                        v-if="!chat.streaming"
-                        type="submit"
-                        :disabled="!chat.input.trim()"
-                    >
-                        Send
-                    </button>
-                    <button v-else type="button" class="stop" @click="onStop">
-                        Stop
-                    </button>
-                </form>
+                    <form class="composer" @submit.prevent="onSubmit">
+                        <textarea
+                            v-model="chat.input"
+                            placeholder="Type a message…"
+                            rows="1"
+                            :disabled="chat.streaming"
+                            @keydown.enter.exact.prevent="onSubmit"
+                        />
+                        <button
+                            v-if="!chat.streaming"
+                            type="submit"
+                            :disabled="!chat.input.trim()"
+                        >
+                            Send
+                        </button>
+                        <button
+                            v-else
+                            type="button"
+                            class="stop"
+                            @click="onStop"
+                        >
+                            Stop
+                        </button>
+                    </form>
                 </div>
             </div>
         </main>
@@ -297,7 +304,7 @@ async function handleLogin() {
 }
 
 .bubble {
-    max-width: 80%;
+    max-width: 90%;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -489,8 +496,3 @@ button[type="submit"]:disabled {
     cursor: not-allowed;
 }
 </style>
-
-
-
-
-

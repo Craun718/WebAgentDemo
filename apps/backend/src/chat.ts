@@ -9,6 +9,11 @@ import type {
   ChatCompletionCreateParamsStreaming,
 } from "openai/resources/chat/completions";
 import type { ChatMessage, ChatRequest } from "@web-agent/shared";
+import {
+  generateRequestId,
+  logRequest,
+  logResponse,
+} from "./llm-logger";
 
 // Provider config (OpenAI-compatible). DeepSeek by default per backend/.env.
 // Read lazily so the server's .env loader (run at startup) is observed.
@@ -136,6 +141,17 @@ export async function chatHandler(c: Context) {
   const model = resolveModel(body.model);
   const wantsStream = body.stream === true;
   const client = createOpenAIClient();
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+
+  // Log the incoming request from frontend
+  logRequest({
+    requestId,
+    model,
+    stream: wantsStream,
+    messageCount: messages.length,
+    messages,
+  });
 
   if (wantsStream) {
     let completionStream: Stream<ChatCompletionChunk>;
@@ -144,14 +160,26 @@ export async function chatHandler(c: Context) {
         buildChatCompletionParams(body, model, true),
       );
     } catch (err) {
-      console.error("[chat] upstream request failed:", err);
+      logResponse({
+        requestId,
+        model,
+        stream: true,
+        content: "",
+        durationMs: Date.now() - startTime,
+        error: String(err),
+      });
       return c.json({ success: false, message: "Failed to reach model provider" }, 502);
     }
+
+    // Accumulate the full response content for logging
+    let fullContent = "";
 
     return streamSSE(c, async (stream) => {
       try {
         for await (const chunk of completionStream) {
           if (stream.aborted) break;
+          const delta = chunk.choices?.[0]?.delta?.content;
+          if (delta) fullContent += delta;
           await stream.writeSSE({ data: JSON.stringify(chunk) });
         }
         if (!stream.aborted) {
@@ -161,6 +189,14 @@ export async function chatHandler(c: Context) {
         if (!stream.aborted) console.error("[chat] stream error:", err);
       } finally {
         completionStream.controller.abort();
+        // Log the complete streamed response
+        logResponse({
+          requestId,
+          model,
+          stream: true,
+          content: fullContent,
+          durationMs: Date.now() - startTime,
+        });
       }
     });
   }
@@ -171,9 +207,32 @@ export async function chatHandler(c: Context) {
       buildChatCompletionParams(body, model, false),
     );
   } catch (err) {
-    console.error("[chat] upstream request failed:", err);
+    logResponse({
+      requestId,
+      model,
+      stream: false,
+      content: "",
+      durationMs: Date.now() - startTime,
+      error: String(err),
+    });
     return c.json({ success: false, message: "Failed to reach model provider" }, 502);
   }
+
+  // Log the non-streaming response
+  logResponse({
+    requestId,
+    model,
+    stream: false,
+    content: completion.choices[0]?.message?.content ?? "",
+    usage: completion.usage
+      ? {
+          prompt_tokens: completion.usage.prompt_tokens,
+          completion_tokens: completion.usage.completion_tokens,
+          total_tokens: completion.usage.total_tokens,
+        }
+      : undefined,
+    durationMs: Date.now() - startTime,
+  });
 
   return c.json(completion);
 }
