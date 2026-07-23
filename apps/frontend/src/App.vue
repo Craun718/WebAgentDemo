@@ -97,7 +97,9 @@ async function handleLogin() {
 
         <!-- Chat -->
         <main class="chat-main">
-            <div class="chat-inner">
+            <div class="left-panel"></div>
+            <div class="right-panel">
+                <div class="chat-inner">
                 <header class="chat-header">
                     <h2>Chat</h2>
                     <button
@@ -146,6 +148,7 @@ async function handleLogin() {
                         Stop
                     </button>
                 </form>
+                </div>
             </div>
         </main>
 
@@ -226,15 +229,27 @@ async function handleLogin() {
     flex: 1;
     overflow: hidden;
     display: flex;
-    justify-content: center;
+    align-items: stretch;
+}
+
+.left-panel {
+    flex: 3;
+}
+
+.right-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .chat-inner {
     width: 100%;
-    max-width: 720px;
+    flex: 1;
     display: flex;
     flex-direction: column;
     padding: 16px 16px 0;
+    overflow: hidden;
 }
 
 .chat-header {
@@ -474,3 +489,8 @@ button[type="submit"]:disabled {
     cursor: not-allowed;
 }
 </style>
+
+
+
+
+
