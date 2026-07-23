@@ -11,13 +11,10 @@ async function scrollToBottom() {
 }
 
 watch(() => chat.messages.length, scrollToBottom);
-watch(
-  () => chatMessageContentToText(chat.messages.at(-1)),
-  scrollToBottom,
-);
+watch(() => chatMessageContentToText(chat.messages.at(-1)), scrollToBottom);
 
 function onSubmit() {
-  void chat.send();
+  chat.send();
 }
 
 function onClear() {
@@ -33,21 +30,12 @@ function onStop() {
   <section class="chat">
     <header class="chat-header">
       <h1>Chat</h1>
-      <button type="button" class="ghost" :disabled="chat.streaming" @click="onClear">
-        Clear
-      </button>
+      <button type="button" class="ghost" :disabled="chat.streaming" @click="onClear">Clear</button>
     </header>
 
     <div ref="listEl" class="messages">
-      <p v-if="!chat.messages.length" class="empty">
-        Send a message to start the conversation.
-      </p>
-      <div
-        v-for="(msg, i) in chat.messages"
-        :key="i"
-        class="bubble"
-        :class="msg.role"
-      >
+      <p v-if="!chat.messages.length" class="empty">Send a message to start the conversation.</p>
+      <div v-for="(msg, i) in chat.messages" :key="i" class="bubble" :class="msg.role">
         <span class="role">{{ msg.role }}</span>
         <p class="text">{{ chatMessageContentToText(msg) }}</p>
       </div>
@@ -59,20 +47,12 @@ function onStop() {
       <textarea
         v-model="chat.input"
         placeholder="Type a message…"
-       rows="1"
+        rows="1"
         :disabled="chat.streaming"
-       @keydown.enter.exact.prevent="onSubmit"
+        @keydown.enter.exact.prevent="onSubmit"
       />
-      <button
-       v-if="!chat.streaming"
-        type="submit"
-       :disabled="!chat.input.trim()"
-      >
-        Send
-      </button>
-      <button v-else type="button" class="stop" @click="onStop">
-        Stop
-      </button>
+      <button v-if="!chat.streaming" type="submit" :disabled="!chat.input.trim()">Send</button>
+      <button v-else type="button" class="stop" @click="onStop">Stop</button>
     </form>
   </section>
 </template>

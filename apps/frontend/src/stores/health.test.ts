@@ -35,10 +35,7 @@ describe("health store", () => {
   });
 
   it("records an error when the request fails", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({ ok: false, status: 500 }),
-    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }));
 
     const health = useHealthStore();
     await health.fetchHealth();

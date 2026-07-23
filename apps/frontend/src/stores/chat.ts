@@ -54,8 +54,7 @@ export const useChatStore = defineStore("chat", {
       this.streaming = true;
       this.error = null;
 
-      const getAssistantContent = () =>
-        chatMessageContentToText(this.messages[assistantIndex]);
+      const getAssistantContent = () => chatMessageContentToText(this.messages[assistantIndex]);
       const setAssistantContent = (nextContent: string) => {
         const current = this.messages[assistantIndex];
         if (!current || current.role !== "assistant") return;

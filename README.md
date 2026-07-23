@@ -21,7 +21,7 @@ moon is a workspace devDependency, so invoke it through pnpm (`pnpm moon ...` or
 pnpm install
 ```
 
-### Develop (runs backend :3000 and frontend :5173 in parallel)
+### Develop (runs backend :3000 and frontend :5000 in parallel)
 
 ```sh
 pnpm dev

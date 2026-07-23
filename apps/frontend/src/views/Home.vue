@@ -25,17 +25,13 @@ function handleLogout() {
       <h1>Web Agent</h1>
       <nav class="header-actions">
         <RouterLink to="/chat" class="nav-link">Chat</RouterLink>
-        <button type="button" class="logout-btn" @click="handleLogout">
-          Logout
-        </button>
+        <button type="button" class="logout-btn" @click="handleLogout">Logout</button>
       </nav>
     </header>
     <section class="card">
       <h2>Backend health</h2>
       <p v-if="health.loading" class="muted">Checking…</p>
-      <p v-else-if="health.error" class="err">
-        Error: {{ health.error }}
-      </p>
+      <p v-else-if="health.error" class="err">Error: {{ health.error }}</p>
       <dl v-else-if="health.data">
         <dt>Status</dt>
         <dd>{{ health.data.status }}</dd>

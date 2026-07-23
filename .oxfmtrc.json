@@ -1,0 +1,10 @@
+{
+  "$schema": "https://oxc.rs/schema/oxfmt.json",
+  "indentStyle": "space",
+  "indentWidth": 4,
+  "quoteStyle": "double",
+  "trailingCommas": "all",
+  "semicolons": "always",
+  "arrowParentheses": "always",
+  "ignorePatterns": ["dist/", "node_modules/", ".moon/cache/", "coverage/"]
+}
