@@ -10,6 +10,7 @@ const auth = useAuthStore();
 const health = useHealthStore();
 const chat = useChatStore();
 const listEl = ref<HTMLDivElement | null>(null);
+const inputEl = ref<HTMLTextAreaElement | null>(null);
 
 onMounted(() => {
     void health.fetchHealth();
@@ -34,7 +35,9 @@ function onSubmit() {
 }
 
 function onClear() {
+    if (chat.messages.length > 0 && !window.confirm("Clear all messages?")) return;
     chat.clear();
+    nextTick(() => inputEl.value?.focus());
 }
 
 function onStop() {
@@ -106,7 +109,6 @@ async function handleLogin() {
                         <button
                             type="button"
                             class="ghost"
-                            :disabled="chat.streaming"
                             @click="onClear"
                         >
                             Clear
@@ -155,6 +157,7 @@ async function handleLogin() {
 
                     <form class="composer" @submit.prevent="onSubmit">
                         <textarea
+                            ref="inputEl"
                             v-model="chat.input"
                             placeholder="Type a message…"
                             rows="1"

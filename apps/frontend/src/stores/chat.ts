@@ -242,6 +242,7 @@ export const useChatStore = defineStore("chat", {
       activeController?.abort();
     },
     clear() {
+      this.stop();
       this.messages = [];
       this.error = null;
       this.toolResults = {};
