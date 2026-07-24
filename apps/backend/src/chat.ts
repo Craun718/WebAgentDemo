@@ -10,6 +10,7 @@ import type {
 } from "openai/resources/chat/completions";
 import type { ChatMessage, ChatRequest } from "@web-agent/shared";
 import { generateRequestId, logRequest, logResponse } from "./llm-logger";
+import type { LoggedToolCall } from "./llm-logger";
 
 // Provider config (OpenAI-compatible). DeepSeek by default per backend/.env.
 // Read lazily so the server's .env loader (run at startup) is observed.
@@ -178,12 +179,29 @@ export async function chatHandler(c: Context) {
     // Accumulate the full response content for logging
     let fullContent = "";
 
+    let finishReason: string | null = null;
+    const toolCallAcc = new Map<number, { id: string; name: string; arguments: string }>();
+
     return streamSSE(c, async (stream) => {
       try {
         for await (const chunk of completionStream) {
           if (stream.aborted) break;
-          const delta = chunk.choices?.[0]?.delta?.content;
-          if (delta) fullContent += delta;
+          const choice = chunk.choices?.[0];
+          if (choice?.delta?.content) fullContent += choice.delta.content;
+          if (choice?.delta?.tool_calls) {
+            for (const tc of choice.delta.tool_calls) {
+              const slot = toolCallAcc.get(tc.index) ?? {
+                id: "",
+                name: "",
+                arguments: "",
+              };
+              if (tc.id) slot.id = tc.id;
+              if (tc.function?.name) slot.name += tc.function.name;
+              if (tc.function?.arguments) slot.arguments += tc.function.arguments;
+              toolCallAcc.set(tc.index, slot);
+            }
+          }
+          if (choice?.finish_reason) finishReason = choice.finish_reason;
           await stream.writeSSE({ data: JSON.stringify(chunk) });
         }
         if (!stream.aborted) {
@@ -193,12 +211,22 @@ export async function chatHandler(c: Context) {
         if (!stream.aborted) console.error("[chat] stream error:", err);
       } finally {
         completionStream.controller.abort();
+        const toolCalls: LoggedToolCall[] = [...toolCallAcc.entries()]
+          .sort(([a], [b]) => a - b)
+          .map(([, v]) => ({
+            id: v.id,
+            type: "function" as const,
+            function: { name: v.name, arguments: v.arguments },
+          }))
+          .filter((t) => t.function.name);
         // Log the complete streamed response
         logResponse({
           requestId,
           model,
           stream: true,
           content: fullContent,
+          toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+          finishReason: finishReason ?? undefined,
           durationMs: Date.now() - startTime,
         });
       }
@@ -228,6 +256,14 @@ export async function chatHandler(c: Context) {
     model,
     stream: false,
     content: completion.choices[0]?.message?.content ?? "",
+    finishReason: completion.choices[0]?.finish_reason ?? undefined,
+    toolCalls: (completion.choices[0]?.message?.tool_calls ?? [])
+      .filter((tc) => tc.type === "function")
+      .map((tc) => ({
+        id: tc.id,
+        type: "function" as const,
+        function: { name: tc.function.name, arguments: tc.function.arguments },
+      })),
     usage: completion.usage
       ? {
           prompt_tokens: completion.usage.prompt_tokens,
