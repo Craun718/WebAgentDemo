@@ -1,0 +1,3 @@
+[submodule "apps/frontend/external"]
+	path = apps/frontend/external
+	url = git@github.com:Craun718/moongazer.git
