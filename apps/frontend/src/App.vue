@@ -133,14 +133,14 @@ async function handleLogin() {
                                 <div
                                     v-for="(call, ci) in chatMessageToolCalls(msg)"
                                     :key="ci"
-                                    class="tool-call"
-                                >
-                                    <span class="tool-name">{{
-                                        call.function.name
-                                    }}</span>
-                                   <code class="tool-args">{{
-                                       call.function.arguments || "{}"
-                                   }}</code>
+                                   class="tool-call"
+                               >
+                                   <span class="tool-name">{{
+                                        call.name
+                                   }}</span>
+                                  <code class="tool-args">{{
+                                       call.arguments || "{}"
+                                  }}</code>
                                     <code v-if="chat.toolResults[call.id]" class="tool-result">=> {{
                                         chat.toolResults[call.id]
                                     }}</code>

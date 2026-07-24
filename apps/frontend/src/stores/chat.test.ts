@@ -1,100 +1,75 @@
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { AgentEvent, AgentMessage } from "moongazer";
 import { useAuthStore } from "./auth";
-import {
-  chatMessageContentToText,
-  chatMessageToolCalls,
-  useChatStore,
-} from "./chat";
+import { chatMessageContentToText, chatMessageToolCalls, useChatStore } from "./chat";
 
-// Hoisted holder so the module mock factory (hoisted above imports) can read
-// per-round SSE scenarios and capture the request payloads sent each round.
+// Hoisted holders so the module mock factory can read per-run scenarios and
+// snapshot the messages passed to agent.run at call time.
 const mocks = vi.hoisted(() => ({
-  scenarios: [] as { events: string[] }[],
-  requests: [] as { messages: unknown[] }[],
+  scenarios: [] as AgentEvent[][],
+  requestRoles: [] as string[][],
 }));
 
-// Minimal subset of the fetchEventSource config we drive inside the mock.
-interface EventSourceConfig {
-  onopen: (res: { status: number; ok: boolean }) => unknown;
-  onmessage: (ev: { data: string }) => void;
-  body?: string;
-}
-
-vi.mock("@microsoft/fetch-event-source", () => ({
-  fetchEventSource: vi.fn(async (_url: string, config: unknown) => {
-    const cfg = config as EventSourceConfig;
-    if (cfg.body) {
-      try {
-        mocks.requests.push({ messages: JSON.parse(cfg.body).messages });
-      } catch {
-        // ignore non-JSON bodies
-      }
-    }
-    await cfg.onopen({ status: 200, ok: true });
-    const scenario = mocks.scenarios.shift();
-    if (scenario) {
-      for (const data of scenario.events) cfg.onmessage({ data });
-      cfg.onmessage({ data: "[DONE]" });
-    }
-    return new Response();
-  }),
-}));
-
-/** Build a minimal streaming chunk carrying the given delta fields. */
-function chunk(delta: Record<string, unknown>, finishReason: string | null = null): string {
-  return JSON.stringify({
-    id: "x",
-    object: "chat.completion.chunk",
-    created: 0,
-    model: "m",
-    choices: [{ index: 0, delta, finish_reason: finishReason }],
-  });
-}
-
-/** A scenario that streams leading text followed by a single tool call. */
-function toolRound(
-  text: string,
-  callId: string,
-  name = "get_current_time",
-): { events: string[] } {
-  return {
-    events: [
-      chunk({ content: text }),
-      chunk(
-        {
-          tool_calls: [
-            { index: 0, id: callId, type: "function", function: { name, arguments: "{}" } },
-          ],
+vi.mock("../agent/instance", () => ({
+  agent: {
+    run: vi.fn(({ messages }: { messages: AgentMessage[] }) => {
+      mocks.requestRoles.push(messages.map((m) => m.role));
+      const events = mocks.scenarios.shift() ?? [];
+      const listeners: Array<(e: AgentEvent) => void> = [];
+      const handle = {
+        subscribe(fn: (e: AgentEvent) => void) {
+          listeners.push(fn);
+          return () => {};
         },
-        "tool_calls",
-      ),
-    ],
-  };
+        stop() {},
+      };
+      // Defer to mimic the real agent emitting after subscribe attaches.
+      queueMicrotask(() => {
+        for (const ev of events) for (const fn of listeners) fn(ev);
+      });
+      return handle;
+    }),
+  },
+}));
+
+/** A tool round (leading text + one tool call) followed by a final answer. */
+function toolRoundThenAnswer(): AgentEvent[] {
+  return [
+    { type: "assistant_start" },
+    { type: "content", delta: "好的，我来帮你查一下当前时间。" },
+    {
+      type: "tool_calls",
+      calls: [{ id: "call_1", name: "get_current_time", arguments: "{}" }],
+    },
+    { type: "tool_result", id: "call_1", result: "2025/1/1 11:37:00" },
+    { type: "assistant_start" },
+    { type: "content", delta: "现在是 11:37。" },
+    { type: "done" },
+  ];
 }
 
-describe("chat store tool-use loop", () => {
+describe("chat store", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     useAuthStore().token = "test-token";
     mocks.scenarios.length = 0;
-    mocks.requests.length = 0;
+    mocks.requestRoles.length = 0;
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("keeps the leading-text bubble and tool result as separate messages", async () => {
-    mocks.scenarios.push(toolRound("好的，我来帮你查一下当前时间。", "call_1"));
-    mocks.scenarios.push({ events: [chunk({ content: "现在是 11:37。" }, "stop")] });
+  it("mirrors events into the leading bubble, tool result, and final bubble", async () => {
+    mocks.scenarios.push(toolRoundThenAnswer());
 
     const chat = useChatStore();
     chat.input = "现在几点了";
     await chat.send();
 
     expect(chat.streaming).toBe(false);
-    // [0] user, [1] assistant (leading + tool call), [2] tool result, [3] final answer.
+    // [0] user, [1] assistant (leading + tool call), [2] tool result, [3] final.
     expect(chat.messages.map((m) => m.role)).toEqual([
       "user",
       "assistant",
@@ -103,38 +78,42 @@ describe("chat store tool-use loop", () => {
     ]);
 
     const leading = chat.messages[1]!;
-    // The leading text must survive instead of being overwritten.
     expect(chatMessageContentToText(leading)).toBe("好的，我来帮你查一下当前时间。");
-    expect(chatMessageToolCalls(leading)[0]!.function.name).toBe("get_current_time");
+    expect(chatMessageToolCalls(leading)[0]!.name).toBe("get_current_time");
 
-    // Tool result is persisted in the list (hidden in the UI) and indexed.
     expect(chat.messages[2]!.role).toBe("tool");
     expect(chat.toolResults["call_1"]).toBeTruthy();
 
     const final = chat.messages[3]!;
     expect(chatMessageContentToText(final)).toBe("现在是 11:37。");
-    // No stale tool calls leaked onto the final bubble.
     expect(chatMessageToolCalls(final)).toHaveLength(0);
   });
 
   it("rebuilds the full history (incl. tool result) on a later send", async () => {
-    // First send: a tool round then a final answer.
-    mocks.scenarios.push(toolRound("查一下。", "call_9"));
-    mocks.scenarios.push({ events: [chunk({ content: "答案是 42。" }, "stop")] });
+    mocks.scenarios.push(toolRoundThenAnswer());
     const chat = useChatStore();
     chat.input = "第一问";
     await chat.send();
 
     // Second send: a plain answer with no tool call.
-    mocks.requests.length = 0;
-    mocks.scenarios.push({ events: [chunk({ content: "好的。" }, "stop")] });
+    mocks.requestRoles.length = 0;
+    mocks.scenarios.push([
+      { type: "assistant_start" },
+      { type: "content", delta: "好的。" },
+      { type: "done" },
+    ]);
     chat.input = "第二问";
     await chat.send();
 
     // The second send's request must include the prior assistant tool_calls
     // turn AND its tool result, so the provider sees a valid sequence.
-    expect(mocks.requests).toHaveLength(1);
-    const roles = (mocks.requests[0]!.messages as { role: string }[]).map((m) => m.role);
-    expect(roles).toEqual(["user", "assistant", "tool", "assistant", "user"]);
+    expect(mocks.requestRoles).toHaveLength(1);
+    expect(mocks.requestRoles[0]).toEqual([
+      "user",
+      "assistant",
+      "tool",
+      "assistant",
+      "user",
+    ]);
   });
 });

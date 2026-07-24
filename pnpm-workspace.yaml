@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "apps/frontend/external/*"
 allowBuilds:
   esbuild: true
 minimumReleaseAgeExclude:

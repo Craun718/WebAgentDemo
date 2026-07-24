@@ -14,9 +14,7 @@ tasks:
     outputs:
       - "dist/**/*"
   typecheck:
-    command: "vue-tsc --noEmit"
-    options:
-      affectedFiles: true
+    command: "pnpm exec vue-tsc --noEmit"
   test:
     command: "vitest run"
     options:
