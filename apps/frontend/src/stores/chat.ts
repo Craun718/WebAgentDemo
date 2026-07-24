@@ -18,6 +18,7 @@ interface ChatState {
   input: string;
   streaming: boolean;
   error: string | null;
+  toolResults: Record<string, string>;
 }
 
 export function chatMessageContentToText(message: ChatMessage | undefined): string {
@@ -130,6 +131,7 @@ export const useChatStore = defineStore("chat", {
     input: "",
     streaming: false,
     error: null,
+    toolResults: {},
   }),
   actions: {
     async send() {
@@ -137,19 +139,24 @@ export const useChatStore = defineStore("chat", {
       const content = this.input.trim();
       if (!auth.token || !content || this.streaming) return;
 
-      const userMsg: ChatMessage = { role: "user", content };
-      // Conversation sent to the model each round (no empty placeholder).
-      const conversation: ChatMessage[] = [...this.messages, userMsg];
-      const assistantIndex = this.messages.length + 1;
-      this.messages.push(userMsg, { role: "assistant", content: "" });
+      // `this.messages` is the single source of truth for both the UI and the
+      // API conversation: it holds the full OpenAI message sequence, including
+      // `tool` result messages (which the UI hides). Keeping tool results in
+      // the list means a later send rebuilds a valid history instead of a
+      // dangling assistant tool_calls turn with no matching tool result.
+      this.messages.push({ role: "user", content }, { role: "assistant", content: "" });
+      // `activeIndex` tracks the assistant bubble currently being streamed
+      // into. Each tool round gets its own bubble, and the API payload for a
+      // round is everything before this index (excludes the placeholder).
+      let activeIndex = this.messages.length - 1;
       this.input = "";
       this.streaming = true;
       this.error = null;
 
-      const setAssistant = (patch: Record<string, unknown>) => {
-        const current = this.messages[assistantIndex];
+      const setAssistant = (index: number, patch: Record<string, unknown>) => {
+        const current = this.messages[index];
         if (!current || current.role !== "assistant") return;
-        this.messages[assistantIndex] = { ...current, ...patch } as ChatMessage;
+        this.messages[index] = { ...current, ...patch } as ChatMessage;
       };
 
       activeController = new AbortController();
@@ -160,20 +167,21 @@ export const useChatStore = defineStore("chat", {
         // Tool-use loop: stream, execute requested tools, feed results back,
         // repeat until the model answers without calling a tool.
         for (;;) {
-          if (steps >= MAX_STEPS) break;
           steps += 1;
+          // Stream into the current assistant bubble.
+          const idx = activeIndex;
 
           const result = await streamOnce(
             {
-              messages: conversation,
+              messages: this.messages.slice(0, idx),
               stream: true,
               tools: apiTools.length ? apiTools : undefined,
               tool_choice: apiTools.length ? "auto" : undefined,
             },
             auth.token,
             activeController.signal,
-            (text) => setAssistant({ content: text }),
-            (calls) => setAssistant({ tool_calls: calls }),
+            (text) => setAssistant(idx, { content: text }),
+            (calls) => setAssistant(idx, { tool_calls: calls }),
           );
 
           if (result.aborted) break;
@@ -181,25 +189,34 @@ export const useChatStore = defineStore("chat", {
           const calledTools = result.toolCalls;
           if (calledTools.length === 0) break;
 
-          // Commit the assistant turn that requested the tools, then append a
-          // result message per tool call before the next round.
-          conversation.push({
-            role: "assistant",
-            content: chatMessageContentToText(this.messages[assistantIndex]) || null,
-            tool_calls: calledTools,
-          } as ChatMessage);
+          // Providers expect null (not "") when an assistant turn emits only
+          // tool calls; empty and null render identically in the UI.
+          if (!chatMessageContentToText(this.messages[idx])) {
+            setAssistant(idx, { content: null });
+          }
 
+          // Append a tool result message per call directly into `this.messages`
+          // so the next round (and any later send) sees a complete sequence.
           for (const call of calledTools) {
             const tool = getTool(call.function.name);
             const args = parseArgs(call.function.arguments);
             const outcome = tool ? await tool.execute(args) : `Unknown tool: ${call.function.name}`;
             const resultText = typeof outcome === "string" ? outcome : JSON.stringify(outcome);
-            conversation.push({
+            this.toolResults[call.id] = resultText;
+            this.messages.push({
               role: "tool",
               tool_call_id: call.id,
               content: resultText,
             } as ChatMessage);
           }
+
+          // Guard before allocating the next bubble so the step limit never
+          // leaves a dangling empty assistant message.
+          if (steps >= MAX_STEPS) break;
+
+          // Next round streams into a fresh assistant bubble.
+          this.messages.push({ role: "assistant", content: "" });
+          activeIndex = this.messages.length - 1;
         }
       } catch (err) {
         if (err instanceof SessionExpiredError) {
@@ -210,11 +227,11 @@ export const useChatStore = defineStore("chat", {
         }
       } finally {
         const aborted = activeController?.signal.aborted === true;
-        const finalText = chatMessageContentToText(this.messages[assistantIndex]);
+        const finalText = chatMessageContentToText(this.messages[activeIndex]);
         if (aborted) {
-          if (!finalText) setAssistant({ content: "(stopped)" });
+          if (!finalText) setAssistant(activeIndex, { content: "(stopped)" });
         } else if (!this.error && !finalText) {
-          setAssistant({ content: "(no response)" });
+          setAssistant(activeIndex, { content: "(no response)" });
         }
         activeController = null;
         this.streaming = false;
@@ -227,6 +244,7 @@ export const useChatStore = defineStore("chat", {
     clear() {
       this.messages = [];
       this.error = null;
+      this.toolResults = {};
     },
   },
 });

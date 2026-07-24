@@ -117,9 +117,9 @@ async function handleLogin() {
                         <p v-if="!chat.messages.length" class="empty">
                             Send a message to start the conversation.
                         </p>
+                        <template v-for="(msg, i) in chat.messages" :key="i">
                         <div
-                            v-for="(msg, i) in chat.messages"
-                            :key="i"
+                            v-if="msg.role !== 'tool'"
                             class="bubble"
                             :class="msg.role"
                         >
@@ -136,16 +136,20 @@ async function handleLogin() {
                                     <span class="tool-name">{{
                                         call.function.name
                                     }}</span>
-                                    <code class="tool-args">{{
-                                        call.function.arguments || "{}"
+                                   <code class="tool-args">{{
+                                       call.function.arguments || "{}"
+                                   }}</code>
+                                    <code v-if="chat.toolResults[call.id]" class="tool-result">=> {{
+                                        chat.toolResults[call.id]
                                     }}</code>
-                                </div>
+                               </div>
                             </div>
-                            <p class="text">
+                           <p v-if="chatMessageContentToText(msg)" class="text">
                                {{ chatMessageContentToText(msg) }}
                            </p>
                        </div>
-                    </div>
+                       </template>
+                   </div>
 
                     <p v-if="chat.error" class="error">{{ chat.error }}</p>
 
@@ -390,6 +394,14 @@ async function handleLogin() {
     font-family: ui-monospace, monospace;
     font-size: 0.75rem;
     color: var(--muted);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.tool-result {
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    color: var(--fg);
     white-space: pre-wrap;
     word-break: break-word;
 }
