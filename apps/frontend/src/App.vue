@@ -3,6 +3,7 @@ import { onMounted } from "vue";
 import { useAuthStore } from "./stores/auth";
 import { useHealthStore } from "./stores/health";
 import { useChatStore, chatMessageContentToText } from "./stores/chat";
+import { chatMessageToolCalls } from "./stores/chat";
 import { ref, nextTick, watch } from "vue";
 
 const auth = useAuthStore();
@@ -122,11 +123,28 @@ async function handleLogin() {
                             class="bubble"
                             :class="msg.role"
                         >
-                            <span class="role">{{ msg.role }}</span>
+                           <span class="role">{{ msg.role }}</span>
+                            <div
+                                v-if="chatMessageToolCalls(msg).length"
+                                class="tool-calls"
+                            >
+                                <div
+                                    v-for="(call, ci) in chatMessageToolCalls(msg)"
+                                    :key="ci"
+                                    class="tool-call"
+                                >
+                                    <span class="tool-name">{{
+                                        call.function.name
+                                    }}</span>
+                                    <code class="tool-args">{{
+                                        call.function.arguments || "{}"
+                                    }}</code>
+                                </div>
+                            </div>
                             <p class="text">
-                                {{ chatMessageContentToText(msg) }}
-                            </p>
-                        </div>
+                               {{ chatMessageContentToText(msg) }}
+                           </p>
+                       </div>
                     </div>
 
                     <p v-if="chat.error" class="error">{{ chat.error }}</p>
@@ -342,6 +360,38 @@ async function handleLogin() {
 
 .bubble.assistant .text {
     background: #1d222b;
+}
+
+.tool-calls {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.tool-call {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 10px;
+    background: #14181f;
+    border: 1px solid #2a2f3a;
+    border-radius: 8px;
+}
+
+.tool-name {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+}
+
+.tool-args {
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    color: var(--muted);
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 .error {

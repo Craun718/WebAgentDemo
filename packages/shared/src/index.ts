@@ -3,6 +3,9 @@
 import type {
   ChatCompletionChunk as OpenAIChatCompletionChunk,
   ChatCompletionMessageParam,
+  ChatCompletionMessageToolCall,
+  ChatCompletionTool,
+  ChatCompletionToolChoiceOption,
 } from "openai/resources/chat/completions";
 
 export interface HealthResponse {
@@ -47,8 +50,17 @@ export interface NowResponse {
 export type ChatMessage = ChatCompletionMessageParam;
 export type ChatCompletionChunk = OpenAIChatCompletionChunk;
 
+// Tool-use support (OpenAI-compatible function calling).
+export type ChatTool = ChatCompletionTool;
+export type ChatToolChoice = ChatCompletionToolChoiceOption;
+export type ChatToolCall = ChatCompletionMessageToolCall;
+/** Shape of an incremental tool-call delta received in a streaming chunk. */
+export type ChatToolCallDelta = OpenAIChatCompletionChunk.Choice.Delta.ToolCall;
+
 export interface ChatRequest {
   messages: ChatMessage[];
   stream?: boolean;
   model?: string;
+  tools?: ChatTool[];
+  tool_choice?: ChatToolChoice;
 }

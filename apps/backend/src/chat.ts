@@ -9,11 +9,7 @@ import type {
   ChatCompletionCreateParamsStreaming,
 } from "openai/resources/chat/completions";
 import type { ChatMessage, ChatRequest } from "@web-agent/shared";
-import {
-  generateRequestId,
-  logRequest,
-  logResponse,
-} from "./llm-logger";
+import { generateRequestId, logRequest, logResponse } from "./llm-logger";
 
 // Provider config (OpenAI-compatible). DeepSeek by default per backend/.env.
 // Read lazily so the server's .env loader (run at startup) is observed.
@@ -53,16 +49,24 @@ export function buildChatCompletionParams(
   model: string,
   stream: boolean,
 ): ChatCompletionCreateParamsStreaming | ChatCompletionCreateParamsNonStreaming {
+  // Forward tool-use params when the client provides them (OpenAI-compatible
+  // function calling). Kept conditional so non-tool requests are unaffected.
+  const toolParams =
+    req.tools && req.tools.length > 0
+      ? { tools: req.tools, ...(req.tool_choice ? { tool_choice: req.tool_choice } : {}) }
+      : {};
   return stream
     ? {
         model,
         messages: req.messages,
         stream: true,
+        ...toolParams,
       }
     : {
         model,
         messages: req.messages,
         stream: false,
+        ...toolParams,
       };
 }
 

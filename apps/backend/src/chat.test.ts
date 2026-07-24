@@ -63,4 +63,29 @@ describe("buildChatCompletionParams", () => {
       stream: false,
     });
   });
+
+  it("forwards tools and tool_choice when provided", () => {
+    const req: ChatRequest = {
+      messages: [{ role: "user", content: "hi" }],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "get_time",
+            description: "Get current time",
+            parameters: { type: "object", properties: {} },
+          },
+        },
+      ],
+      tool_choice: "auto",
+    };
+
+    expect(buildChatCompletionParams(req, "deepseek-chat", true)).toEqual({
+      model: "deepseek-chat",
+      messages: [{ role: "user", content: "hi" }],
+      stream: true,
+      tools: req.tools,
+      tool_choice: "auto",
+    });
+  });
 });
