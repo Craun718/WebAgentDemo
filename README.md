@@ -5,7 +5,7 @@ A moon-managed pnpm monorepo with a Hono (Node) backend and a Vite 8 + Vue 3 fro
 ## Layout
 
 - `packages/shared` — shared TS types and helpers, consumed from source (no build step).
-- `apps/backend` — Hono API on Node (`@hono/node-server`), `tsx` dev, `tsup` build.
+- `apps/backend` — Hono API on Node (`@hono/node-server`), `tsx` dev, `tsdown` build.
 - `apps/frontend` — Vite 8 + Vue 3 SPA with vue-router and pinia.
 
 ## Prerequisites

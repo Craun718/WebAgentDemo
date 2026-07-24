@@ -10,7 +10,7 @@ tasks:
   dev:
     command: "tsx watch src/index.ts"
   build:
-    command: "tsup src/index.ts --format esm --dts --out-dir dist"
+    command: "pnpm exec tsdown"
     outputs:
       - "dist/**/*"
   typecheck:

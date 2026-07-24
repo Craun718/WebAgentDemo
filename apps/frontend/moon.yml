@@ -10,7 +10,7 @@ tasks:
   dev:
     command: "vite"
   build:
-    script: "vue-tsc --noEmit && vite build"
+    script: "pnpm exec vue-tsc --noEmit && pnpm exec vite build"
     outputs:
       - "dist/**/*"
   typecheck:
