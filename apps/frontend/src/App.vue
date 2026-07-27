@@ -126,7 +126,18 @@ async function handleLogin() {
                             :class="msg.role"
                         >
                            <span class="role">{{ msg.role }}</span>
-                            <div
+                          <!-- Reasoning block: per-message, preserved across turns -->
+                          <details
+                              v-if="msg.role === 'assistant' && chat.reasoning[i]"
+                              class="reasoning"
+                          >
+                              <summary>Thinking</summary>
+                              <pre>{{ chat.reasoning[i] }}</pre>
+                          </details>
+                          <p v-if="chatMessageContentToText(msg)" class="text">
+                              {{ chatMessageContentToText(msg) }}
+                          </p>
+                           <div
                                 v-if="chatMessageToolCalls(msg).length"
                                 class="tool-calls"
                             >
@@ -145,10 +156,7 @@ async function handleLogin() {
                                         chat.toolResults[call.id]
                                     }}</code>
                                </div>
-                            </div>
-                           <p v-if="chatMessageContentToText(msg)" class="text">
-                               {{ chatMessageContentToText(msg) }}
-                           </p>
+                           </div>
                        </div>
                        </template>
                    </div>
@@ -367,6 +375,33 @@ async function handleLogin() {
 
 .bubble.assistant .text {
     background: #1d222b;
+}
+
+.reasoning {
+    margin-bottom: 6px;
+    padding: 6px 10px;
+    background: #14181f;
+    border-left: 2px solid #5a5f6a;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: #9aa0ac;
+}
+
+.reasoning summary {
+    cursor: pointer;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #7a808d;
+    user-select: none;
+}
+
+.reasoning pre {
+    margin: 6px 0 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+    font-family: inherit;
 }
 
 .tool-calls {
