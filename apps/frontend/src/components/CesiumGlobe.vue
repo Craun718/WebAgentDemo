@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
 import * as Cesium from "cesium";
+import { setViewer } from "../agent/cesiumViewer";
 
 const container = ref<HTMLDivElement | null>(null);
 let viewer: Cesium.Viewer | null = null;
 
 // Set default Ion token (free tier; works for development)
-Cesium.Ion.defaultAccessToken =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJhM2QxNzQ2MC04YmVhLTQyMGUtYmI1MC0yZDU3MDY1ZWIyNDMiLCJpZCI6Mjg3NzQxLCJpYXQiOjE3NDM0MzUyNjB9.1lUAm9uEQ1G_jXnlvE4kSE3h3AXQpFpwYfKjjFq5F8c";
+const cesiumToken = import.meta.env.VITE_CESIUM_ION_TOKEN;
+Cesium.Ion.defaultAccessToken = cesiumToken;
 
 onMounted(() => {
     if (!container.value) return;
@@ -23,9 +24,11 @@ onMounted(() => {
         infoBox: false,
         selectionIndicator: false,
     });
+    setViewer(viewer);
 });
 
 onUnmounted(() => {
+    setViewer(null);
     if (viewer) {
         viewer.destroy();
         viewer = null;

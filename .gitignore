@@ -22,7 +22,6 @@ pnpm-debug.log*
 *.tsbuildinfo
 
 # secrets (e.g. backend/.env with the upstream API key)
-.env
 .env.*
 
 # test coverage
