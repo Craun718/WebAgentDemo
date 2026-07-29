@@ -122,10 +122,13 @@ function badRequest(c: Context, message: string) {
  */
 export async function chatHandler(c: Context) {
   if (!apiKey()) {
+    const msg =
+      "Upstream API key (API_KEY) is not configured. Set API_KEY in backend/.env or environment.";
+    console.error("[chat] %s", msg);
     return c.json(
       {
         success: false,
-        message: "Upstream API key is not configured",
+        message: msg,
       },
       503,
     );

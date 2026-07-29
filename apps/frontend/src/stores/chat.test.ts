@@ -70,12 +70,7 @@ describe("chat store", () => {
 
     expect(chat.streaming).toBe(false);
     // [0] user, [1] assistant (leading + tool call), [2] tool result, [3] final.
-    expect(chat.messages.map((m) => m.role)).toEqual([
-      "user",
-      "assistant",
-      "tool",
-      "assistant",
-    ]);
+    expect(chat.messages.map((m) => m.role)).toEqual(["user", "assistant", "tool", "assistant"]);
 
     const leading = chat.messages[1]!;
     expect(chatMessageContentToText(leading)).toBe("好的，我来帮你查一下当前时间。");
@@ -108,12 +103,6 @@ describe("chat store", () => {
     // The second send's request must include the prior assistant tool_calls
     // turn AND its tool result, so the provider sees a valid sequence.
     expect(mocks.requestRoles).toHaveLength(1);
-    expect(mocks.requestRoles[0]).toEqual([
-      "user",
-      "assistant",
-      "tool",
-      "assistant",
-      "user",
-    ]);
+    expect(mocks.requestRoles[0]).toEqual(["user", "assistant", "tool", "assistant", "user"]);
   });
 });

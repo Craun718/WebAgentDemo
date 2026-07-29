@@ -40,9 +40,15 @@ const flyTo: AgentTool = {
   parameters: Type.Object({
     longitude: Type.Number({ description: "Longitude in decimal degrees" }),
     latitude: Type.Number({ description: "Latitude in decimal degrees" }),
-    height: Type.Optional(Type.Number({ description: "View height above ground in meters (default 20000)" })),
-    heading: Type.Optional(Type.Number({ description: "Heading in degrees clockwise from north (default 0)" })),
-    pitch: Type.Optional(Type.Number({ description: "Pitch in degrees below horizon (default -90, straight down)" })),
+    height: Type.Optional(
+      Type.Number({ description: "View height above ground in meters (default 20000)" }),
+    ),
+    heading: Type.Optional(
+      Type.Number({ description: "Heading in degrees clockwise from north (default 0)" }),
+    ),
+    pitch: Type.Optional(
+      Type.Number({ description: "Pitch in degrees below horizon (default -90, straight down)" }),
+    ),
   }),
   execute: (args: Record<string, unknown>) => {
     const longitude = Number(args.longitude);
@@ -57,11 +63,7 @@ const flyTo: AgentTool = {
     }
     try {
       viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(
-          longitude,
-          latitude,
-          height,
-        ),
+        destination: Cesium.Cartesian3.fromDegrees(longitude, latitude, height),
         orientation: {
           heading: Cesium.Math.toRadians(heading),
           pitch: Cesium.Math.toRadians(pitch),

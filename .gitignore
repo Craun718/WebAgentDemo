@@ -23,10 +23,14 @@ pnpm-debug.log*
 
 # secrets (e.g. backend/.env with the upstream API key)
 .env.*
+# node 只读.env不读.env.local
+apps/backend/.env
 
 # test coverage
 coverage/
 
 # vite
 .vite/
-.pnpm-store/v11/index.db
+
+# pnpm
+.pnpm-store/

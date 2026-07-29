@@ -1,26 +1,27 @@
 {
-    "name": "web-agent",
-    "version": "0.0.0",
-    "private": true,
-    "type": "module",
-    "scripts": {
-        "dev": "moon run :dev",
-        "build": "moon run :build",
-        "check": "moon run :typecheck",
-        "test": "moon run :test",
-        "lint": "oxlint .",
-        "format": "oxfmt . --write",
-        "format:check": "oxfmt . --check",
-        "moon": "moon"
-    },
-    "devDependencies": {
-        "@moonrepo/cli": "^2.4.5",
-        "oxlint": "^1.74.0",
-        "typescript": "^5.9.0",
-        "vitest": "^4.1.10"
-    },
-    "engines": {
-        "node": ">=22"
-    },
-    "packageManager": "pnpm@11.13.1"
+  "name": "web-agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "moon run :dev",
+    "build": "moon run :build",
+    "check": "moon run :typecheck",
+    "test": "moon run :test",
+    "lint": "oxlint .",
+    "format": "oxfmt . --write",
+    "format:check": "oxfmt . --check",
+    "moon": "moon"
+  },
+  "devDependencies": {
+    "@moonrepo/cli": "^2.4.5",
+    "oxfmt": "^0.61.0",
+    "oxlint": "^1.74.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@11.13.1"
 }

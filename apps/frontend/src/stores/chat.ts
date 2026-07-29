@@ -75,7 +75,7 @@ export const useChatStore = defineStore("chat", {
 
       const off = activeHandle.subscribe((event: AgentEvent) => {
         switch (event.type) {
-         case "assistant_start":
+          case "assistant_start":
             this.messages.push({ role: "assistant", content: "" });
             activeIndex = this.messages.length - 1;
             this.reasoning[activeIndex] = "";
@@ -85,10 +85,10 @@ export const useChatStore = defineStore("chat", {
               content: (this.messages[activeIndex]?.content ?? "") + event.delta,
             });
             break;
-         case "reasoning":
-           this.reasoning[activeIndex] = (this.reasoning[activeIndex] ?? "") + event.delta;
-           break;
-         case "tool_calls":
+          case "reasoning":
+            this.reasoning[activeIndex] = (this.reasoning[activeIndex] ?? "") + event.delta;
+            break;
+          case "tool_calls":
             setAssistant({ toolCalls: event.calls });
             // Providers expect null (not "") when an assistant turn emits only
             // tool calls; empty and null render identically in the UI.
