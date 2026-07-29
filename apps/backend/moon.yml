@@ -8,14 +8,14 @@ dependsOn:
 
 tasks:
   dev:
-    command: "tsx watch src/index.ts"
+    command: "pnpm exec tsx watch src/index.ts"
   build:
     command: "pnpm exec tsdown"
     outputs:
       - "dist/**/*"
   typecheck:
-    command: "tsc --noEmit"
+    command: "pnpm exec tsc --noEmit"
   test:
-    command: "vitest run"
+    command: "pnpm exec vitest run"
     options:
       affectedFiles: true

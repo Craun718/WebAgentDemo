@@ -8,7 +8,7 @@ dependsOn:
 
 tasks:
   dev:
-    command: "vite"
+    command: "pnpm exec vite"
   build:
     script: "pnpm exec vue-tsc --noEmit && pnpm exec vite build"
     outputs:
@@ -16,7 +16,7 @@ tasks:
   typecheck:
     command: "pnpm exec vue-tsc --noEmit"
   test:
-    command: "vitest run"
+    command: "pnpm exec vitest run"
     options:
       affectedFiles: true
   lint:
