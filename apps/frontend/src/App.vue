@@ -46,6 +46,7 @@ function onStop() {
 
 // ---- Login ----
 import { ref as loginRef } from "vue";
+import CesiumGlobe from "./components/CesiumGlobe.vue";
 
 const username = loginRef("admin");
 const password = loginRef("admin");
@@ -101,7 +102,9 @@ async function handleLogin() {
 
         <!-- Chat -->
         <main class="chat-main">
-            <div class="left-panel"></div>
+            <div class="left-panel">
+                <CesiumGlobe />
+            </div>
             <div class="right-panel">
                 <div class="chat-inner">
                     <header class="chat-header">
