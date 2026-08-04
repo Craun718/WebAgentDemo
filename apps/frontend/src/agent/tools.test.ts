@@ -59,7 +59,7 @@ import { tools } from "./tools";
 
 const toolByName = (name: string) => tools.find((t) => t.name === name);
 const run = (name: string, args: Record<string, unknown> = {}) =>
-  toolByName(name)!.execute(args) as string;
+  toolByName(name)!.execute(args, { signal: new AbortController().signal }) as string;
 /** Extract the id from a draw_* result like "... (id: circle-3)." */
 const idFrom = (result: string): string => {
   const id = result.match(/id: ([^)]+)\)/)?.[1];
