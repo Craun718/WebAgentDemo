@@ -1,20 +1,22 @@
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentEvent, AgentMessage } from "moongazer";
 import { useAuthStore } from "./auth";
 import { chatMessageContentToText, chatMessageToolCalls, useChatStore } from "./chat";
+import type { AgentEvent, AgentMessage } from "../agent/types";
 
 // Hoisted holders so the module mock factory can read per-run scenarios and
 // snapshot the messages passed to agent.run at call time.
 const mocks = vi.hoisted(() => ({
   scenarios: [] as AgentEvent[][],
   requestRoles: [] as string[][],
+  requestMessages: [] as AgentMessage[][],
 }));
 
 vi.mock("../agent/instance", () => ({
   agent: {
     run: vi.fn(({ messages }: { messages: AgentMessage[] }) => {
       mocks.requestRoles.push(messages.map((m) => m.role));
+      mocks.requestMessages.push(messages.map((message) => ({ ...message })));
       const events = mocks.scenarios.shift() ?? [];
       const listeners: Array<(e: AgentEvent) => void> = [];
       const handle = {
@@ -55,6 +57,7 @@ describe("chat store", () => {
     useAuthStore().token = "test-token";
     mocks.scenarios.length = 0;
     mocks.requestRoles.length = 0;
+    mocks.requestMessages.length = 0;
   });
 
   afterEach(() => {
@@ -104,5 +107,49 @@ describe("chat store", () => {
     // turn AND its tool result, so the provider sees a valid sequence.
     expect(mocks.requestRoles).toHaveLength(1);
     expect(mocks.requestRoles[0]).toEqual(["user", "assistant", "tool", "assistant", "user"]);
+  });
+
+  it("persists reasoning and replays it in later model requests", async () => {
+    mocks.scenarios.push([
+      { type: "assistant_start" },
+      { type: "reasoning", delta: "first " },
+      { type: "reasoning", delta: "thought" },
+      {
+        type: "tool_calls",
+        calls: [{ id: "call_1", name: "get_current_time", arguments: "{}" }],
+      },
+      { type: "tool_result", id: "call_1", result: "11:37" },
+      { type: "assistant_start" },
+      { type: "reasoning", delta: "final thought" },
+      { type: "content", delta: "Done." },
+      { type: "done" },
+    ]);
+    const chat = useChatStore();
+    chat.input = "现在几点了";
+    await chat.send();
+
+    const assistant = chat.messages[1];
+    expect(assistant?.role).toBe("assistant");
+    if (assistant?.role !== "assistant") return;
+    expect(assistant.reasoning).toBe("first thought");
+    expect(chat.messages[3]).toMatchObject({ role: "assistant", reasoning: "final thought" });
+
+    mocks.scenarios.push([
+      { type: "assistant_start" },
+      { type: "content", delta: "好的。" },
+      { type: "done" },
+    ]);
+    chat.input = "谢谢";
+    await chat.send();
+
+    const laterRequest = mocks.requestMessages.at(-1);
+    expect(laterRequest?.[1]).toMatchObject({
+      role: "assistant",
+      reasoning: "first thought",
+    });
+    expect(laterRequest?.[3]).toMatchObject({
+      role: "assistant",
+      reasoning: "final thought",
+    });
   });
 });

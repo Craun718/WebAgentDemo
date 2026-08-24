@@ -1,6 +1,3 @@
-import { fetchEventSource } from "@microsoft/fetch-event-source";
-import type { OpenAIChatChunk, OpenAIRawRequest, OpenAIRawStream } from "moongazer";
-
 /** Thrown when the proxy rejects the request as unauthorized. */
 export class SessionExpiredError extends Error {
   constructor() {
@@ -9,100 +6,80 @@ export class SessionExpiredError extends Error {
   }
 }
 
+type ChatRequestBody = {
+  messages?: unknown[];
+};
+
+type ReasoningResolver = (message: Record<string, unknown>) => string | undefined;
+
 /**
- * Build a raw OpenAI-compatible stream backed by the backend's `/api/v1/chat`
- * SSE endpoint. The token is read lazily on each request via `getToken` so it
- * always reflects the current auth state.
- *
- * Bridges fetch-event-source's push model into an async iterable so moongazer's
- * transport can consume it with `for await`.
+ * Keeps the OpenAI SDK's request format while sending it to the app's existing
+ * authenticated chat proxy. The SDK is configured with `/api/v1` as its base;
+ * this replaces only its `/chat/completions` suffix.
  */
-export function createRawStream(getToken: () => string | null): OpenAIRawStream {
-  return (request, signal) => createStream(request, signal, getToken());
+export function createBackendFetch(
+  getToken: () => string | null,
+  getReasoningContent?: ReasoningResolver,
+): typeof fetch {
+  return async (input, init) => {
+    const url =
+      input instanceof Request
+        ? new URL(input.url)
+        : new URL(input.toString(), globalThis.location?.origin);
+    if (url.pathname.endsWith("/chat/completions")) {
+      url.pathname = "/api/v1/chat";
+    }
+
+    const token = getToken();
+    const headers = new Headers(input instanceof Request ? input.headers : init?.headers);
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+
+    let body: BodyInit | null | undefined =
+      input instanceof Request ? await input.text() : init?.body;
+    if (getReasoningContent && typeof body === "string" && body !== "") {
+      try {
+        const parsed = JSON.parse(body) as ChatRequestBody;
+        if (Array.isArray(parsed.messages)) {
+          for (const message of parsed.messages) {
+            if (typeof message !== "object" || message === null) continue;
+            const assistant = message as Record<string, unknown>;
+            if (assistant.role !== "assistant" || assistant.reasoning_content !== undefined)
+              continue;
+            const reasoning = getReasoningContent(assistant);
+            if (reasoning !== undefined) assistant.reasoning_content = reasoning;
+          }
+          body = JSON.stringify(parsed);
+        }
+      } catch {
+        // Leave non-JSON request bodies untouched.
+      }
+    }
+
+    const request = new Request(url, {
+      body,
+      cache: input instanceof Request ? input.cache : init?.cache,
+      credentials: input instanceof Request ? input.credentials : init?.credentials,
+      headers,
+      integrity: input instanceof Request ? input.integrity : init?.integrity,
+      keepalive: input instanceof Request ? input.keepalive : init?.keepalive,
+      method: input instanceof Request ? input.method : init?.method,
+      mode: input instanceof Request ? input.mode : init?.mode,
+      redirect: input instanceof Request ? input.redirect : init?.redirect,
+      referrer: input instanceof Request ? input.referrer : init?.referrer,
+      signal: input instanceof Request ? input.signal : init?.signal,
+    });
+
+    const response = await fetch(request);
+    if (response.status === 401) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new SessionExpiredError();
+    }
+    return response;
+  };
 }
 
-function createStream(
-  request: OpenAIRawRequest,
-  signal: AbortSignal,
-  token: string | null,
-): AsyncIterable<OpenAIChatChunk> {
-  const queue: OpenAIChatChunk[] = [];
-  let pending: ((result: IteratorResult<OpenAIChatChunk>) => void) | null = null;
-  let done = false;
-  let streamError: unknown = null;
-
-  const push = (chunk: OpenAIChatChunk): void => {
-    if (done) return;
-    if (pending) {
-      const resolve = pending;
-      pending = null;
-      resolve({ value: chunk, done: false });
-    } else {
-      queue.push(chunk);
-    }
-  };
-
-  const finish = (error?: unknown): void => {
-    if (done) return;
-    done = true;
-    streamError = error ?? null;
-    if (pending) {
-      const resolve = pending;
-      pending = null;
-      resolve({ value: undefined, done: true });
-    }
-  };
-
-  void fetchEventSource("/api/v1/chat", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({ ...request, stream: true }),
-    signal,
-    openWhenHidden: true,
-    async onopen(res) {
-      if (res.status === 401) throw new SessionExpiredError();
-      if (!res.ok) throw new Error(`Request failed (${res.status})`);
-    },
-    onmessage(ev) {
-      if (ev.data === "[DONE]") return;
-      try {
-        push(JSON.parse(ev.data) as OpenAIChatChunk);
-      } catch {
-        // ignore non-JSON keepalive/partial frames
-      }
-    },
-    onerror(err) {
-      // Throw to stop fetch-event-source from auto-reconnecting.
-      throw err;
-    },
-  }).then(
-    () => finish(),
-    (err) => finish(err),
-  );
-
-  return {
-    [Symbol.asyncIterator]() {
-      return {
-        next(): Promise<IteratorResult<OpenAIChatChunk>> {
-          if (queue.length > 0) {
-            return Promise.resolve({ value: queue.shift() as OpenAIChatChunk, done: false });
-          }
-          if (done) {
-            if (streamError) return Promise.reject(streamError);
-            return Promise.resolve({ value: undefined, done: true });
-          }
-          return new Promise((resolve) => {
-            pending = resolve;
-          });
-        },
-        return(): Promise<IteratorResult<OpenAIChatChunk>> {
-          finish();
-          return Promise.resolve({ value: undefined, done: true });
-        },
-      };
-    },
-  };
+export function isSessionExpired(error: unknown): boolean {
+  if (error instanceof SessionExpiredError) return true;
+  const status = (error as { status?: unknown } | null)?.status;
+  return status === 401;
 }

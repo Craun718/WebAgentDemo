@@ -1,8 +1,14 @@
 import { defineStore } from "pinia";
-import type { AgentEvent, AgentMessage, AgentRunHandle, ToolCallPart } from "moongazer";
 import { useAuthStore } from "./auth";
 import { agent } from "../agent/instance";
-import { SessionExpiredError } from "../agent/transport";
+import { isSessionExpired } from "../agent/transport";
+import type {
+  AgentEvent,
+  AgentMessage,
+  AgentRunHandle,
+  AssistantMessage,
+  ToolCallPart,
+} from "../agent/types";
 
 interface ChatState {
   messages: AgentMessage[];
@@ -60,7 +66,7 @@ export const useChatStore = defineStore("chat", {
       // Index of the assistant message currently being built by this run.
       let activeIndex = -1;
       // Patch the in-progress assistant message in place (immutably).
-      const setAssistant = (patch: Partial<AgentMessage>): void => {
+      const setAssistant = (patch: Partial<AssistantMessage>): void => {
         const current = this.messages[activeIndex];
         if (!current || current.role !== "assistant") return;
         this.messages[activeIndex] = { ...current, ...patch };
@@ -68,7 +74,7 @@ export const useChatStore = defineStore("chat", {
 
       // Start the run over the full history; the handle lets us subscribe to
       // events and stop generation mid-stream.
-      activeHandle = agent.run({ messages: this.messages });
+      activeHandle = agent.run({ messages: [...this.messages] });
 
       // A promise that resolves once the run ends (done/abort/error), so send
       // can await completion before returning.
@@ -105,6 +111,12 @@ export const useChatStore = defineStore("chat", {
             break;
           case "reasoning":
             // Append a reasoning delta, kept separate from visible content.
+            const current = this.messages[activeIndex];
+            const previousReasoning =
+              current?.role === "assistant" ? (current.reasoning ?? "") : "";
+            setAssistant({
+              reasoning: previousReasoning + event.delta,
+            });
             this.reasoning[activeIndex] = (this.reasoning[activeIndex] ?? "") + event.delta;
             break;
           case "tool_calls":
@@ -135,11 +147,13 @@ export const useChatStore = defineStore("chat", {
             finish();
             break;
           case "error":
-            if (event.error instanceof SessionExpiredError) {
+            const errorText =
+              event.error instanceof Error ? event.error.message : String(event.error);
+            if (isSessionExpired(event.error)) {
               auth.logout();
-              this.error = event.error.message;
+              this.error = errorText;
             } else {
-              this.error = event.error instanceof Error ? event.error.message : String(event.error);
+              this.error = errorText;
             }
             finish();
             break;

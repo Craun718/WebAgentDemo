@@ -1,24 +1,11 @@
-import type { AgentTool } from "moongazer";
-import { Type } from "moongazer";
+import { tool } from "@langchain/core/tools";
 import { getViewer } from "./cesiumViewer";
 import * as Cesium from "cesium";
+import { z } from "zod";
 
 /** Returns the current time in a given IANA timezone. */
-const getCurrentTime: AgentTool = {
-  name: "get_current_time",
-  description:
-    "Get the current date and time in the user's locale. " +
-    "Provide `timeZone` as an IANA identifier (e.g. 'Asia/Shanghai', 'America/New_York').",
-  // Use a TypeBox schema (not a plain object) so moongazer's Value.Cast can
-  // dispatch on the TypeBox.Kind symbol; a bare JSON Schema object throws
-  // "Unknown type" inside Value.Check.
-  parameters: Type.Object({
-    // IANA timezone identifier required.
-    timeZone: Type.String(),
-  }),
-  // An invalid timeZone is reported back to the model instead of silently
-  // falling back, so the model can retry with a correct IANA identifier.
-  execute: ({ timeZone }) => {
+const getCurrentTime = tool(
+  ({ timeZone }) => {
     if (typeof timeZone !== "string" || timeZone.trim() === "") {
       return `Invalid timeZone parameter: ${JSON.stringify(timeZone)}. Provide an IANA timezone identifier such as 'Asia/Shanghai' or 'America/New_York'.`;
     }
@@ -28,34 +15,36 @@ const getCurrentTime: AgentTool = {
       return `Invalid timeZone parameter: "${timeZone}". Provide a valid IANA timezone identifier such as 'Asia/Shanghai' or 'America/New_York'.`;
     }
   },
-};
+  {
+    name: "get_current_time",
+    description:
+      "Get the current date and time in the user's locale. " +
+      "Provide `timeZone` as an IANA identifier (e.g. 'Asia/Shanghai', 'America/New_York').",
+    schema: z.object({
+      timeZone: z.string().describe("IANA timezone identifier"),
+    }),
+  },
+);
+
+const flyToSchema = z.object({
+  longitude: z.number().describe("Longitude in decimal degrees"),
+  latitude: z.number().describe("Latitude in decimal degrees"),
+  height: z.number().optional().describe("View height above ground in meters (default 20000)"),
+  heading: z.number().optional().describe("Heading in degrees clockwise from north (default 0)"),
+  pitch: z
+    .number()
+    .optional()
+    .describe("Pitch in degrees below horizon (default -90, straight down)"),
+});
 
 /** Fly the Cesium globe camera to a given location. */
-const flyTo: AgentTool = {
-  name: "fly_to",
-  description:
-    "Fly the Cesium 3D globe camera to a specific geographic location. " +
-    "Provide longitude and latitude in decimal degrees. " +
-    "Optionally set view height (meters), heading, pitch, and roll (degrees).",
-  parameters: Type.Object({
-    longitude: Type.Number({ description: "Longitude in decimal degrees" }),
-    latitude: Type.Number({ description: "Latitude in decimal degrees" }),
-    height: Type.Optional(
-      Type.Number({ description: "View height above ground in meters (default 20000)" }),
-    ),
-    heading: Type.Optional(
-      Type.Number({ description: "Heading in degrees clockwise from north (default 0)" }),
-    ),
-    pitch: Type.Optional(
-      Type.Number({ description: "Pitch in degrees below horizon (default -90, straight down)" }),
-    ),
-  }),
-  execute: (args: Record<string, unknown>) => {
-    const longitude = Number(args.longitude);
-    const latitude = Number(args.latitude);
-    const height = args.height != null ? Number(args.height) : 20000;
-    const heading = args.heading != null ? Number(args.heading) : 0;
-    const pitch = args.pitch != null ? Number(args.pitch) : -90;
+const flyTo = tool(
+  (args: z.output<typeof flyToSchema>) => {
+    const longitude = args.longitude;
+    const latitude = args.latitude;
+    const height = args.height ?? 20000;
+    const heading = args.heading ?? 0;
+    const pitch = args.pitch ?? -90;
 
     const viewer = getViewer();
     if (!viewer) {
@@ -75,17 +64,19 @@ const flyTo: AgentTool = {
       return `flyTo failed: ${err instanceof Error ? err.message : String(err)}`;
     }
   },
-};
+  {
+    name: "fly_to",
+    description:
+      "Fly the Cesium 3D globe camera to a specific geographic location. " +
+      "Provide longitude and latitude in decimal degrees. " +
+      "Optionally set view height (meters), heading, pitch, and roll (degrees).",
+    schema: flyToSchema,
+  },
+);
 
 /** Get the current Cesium camera position and orientation. */
-const getCameraInfo: AgentTool = {
-  name: "get_camera_info",
-  description:
-    "Get the current Cesium globe camera position (longitude, latitude, height) " +
-    "and orientation (heading, pitch, roll) in decimal degrees. " +
-    "Takes no parameters; useful for understanding what the user is currently looking at.",
-  parameters: Type.Object({}),
-  execute: () => {
+const getCameraInfo = tool(
+  () => {
     const viewer = getViewer();
     if (!viewer) {
       return "Cesium globe is not initialized yet. Please wait for the page to load.";
@@ -111,7 +102,15 @@ const getCameraInfo: AgentTool = {
       return `getCameraInfo failed: ${err instanceof Error ? err.message : String(err)}`;
     }
   },
-};
+  {
+    name: "get_camera_info",
+    description:
+      "Get the current Cesium globe camera position (longitude, latitude, height) " +
+      "and orientation (heading, pitch, roll) in decimal degrees. " +
+      "Takes no parameters; useful for understanding what the user is currently looking at.",
+    schema: z.object({}),
+  },
+);
 
 /** Default fill/outline color (CSS color string) for shapes drawn by the agent. */
 const DEFAULT_DRAW_COLOR = "#ff9500";
@@ -154,37 +153,29 @@ function resolveColor(color: unknown): string {
   return typeof color === "string" && color.trim() !== "" ? color : DEFAULT_DRAW_COLOR;
 }
 
+const drawCircleSchema = z.object({
+  longitude: z.number().describe("Center longitude in decimal degrees"),
+  latitude: z.number().describe("Center latitude in decimal degrees"),
+  radius: z.number().describe("Circle radius in meters"),
+  color: z.string().optional().describe("CSS color (e.g. '#ff9500', 'red'); defaults to orange"),
+});
+
 /** Draw a filled circle (geodesic) on the Cesium globe. */
-const drawCircle: AgentTool = {
-  name: "draw_circle",
-  description:
-    "Draw a filled circle on the Cesium 3D globe. " +
-    "Provide the center longitude and latitude in decimal degrees and the radius in meters. " +
-    "Optionally specify a fill/outline color as a CSS color string (e.g. '#ff9500', 'red'). " +
-    "Shapes persist on the globe and each is assigned an id (returned in the result) " +
-    "that can be used with list_drawings and remove_drawing.",
-  parameters: Type.Object({
-    longitude: Type.Number({ description: "Center longitude in decimal degrees" }),
-    latitude: Type.Number({ description: "Center latitude in decimal degrees" }),
-    radius: Type.Number({ description: "Circle radius in meters" }),
-    color: Type.Optional(
-      Type.String({ description: "CSS color (e.g. '#ff9500', 'red'); defaults to orange" }),
-    ),
-  }),
-  execute: (args: Record<string, unknown>) => {
-    const longitude = Number(args.longitude);
-    const latitude = Number(args.latitude);
-    const radius = Number(args.radius);
+const drawCircle = tool(
+  (args: z.output<typeof drawCircleSchema>) => {
+    const longitude = args.longitude;
+    const latitude = args.latitude;
+    const radius = args.radius;
     const colorStr = resolveColor(args.color);
 
     if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
-      return `Invalid longitude: ${JSON.stringify(args.longitude)}. Provide a value in [-180, 180].`;
+      return `Invalid longitude: ${JSON.stringify(longitude)}. Provide a value in [-180, 180].`;
     }
     if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
-      return `Invalid latitude: ${JSON.stringify(args.latitude)}. Provide a value in [-90, 90].`;
+      return `Invalid latitude: ${JSON.stringify(latitude)}. Provide a value in [-90, 90].`;
     }
     if (!Number.isFinite(radius) || radius <= 0) {
-      return `Invalid radius: ${JSON.stringify(args.radius)}. Provide a positive number of meters.`;
+      return `Invalid radius: ${JSON.stringify(radius)}. Provide a positive number of meters.`;
     }
 
     const viewer = getViewer();
@@ -215,36 +206,37 @@ const drawCircle: AgentTool = {
       return `draw_circle failed: ${err instanceof Error ? err.message : String(err)}`;
     }
   },
-};
+  {
+    name: "draw_circle",
+    description:
+      "Draw a filled circle on the Cesium 3D globe. " +
+      "Provide the center longitude and latitude in decimal degrees and the radius in meters. " +
+      "Optionally specify a fill/outline color as a CSS color string (e.g. '#ff9500', 'red'). " +
+      "Shapes persist on the globe and each is assigned an id (returned in the result) " +
+      "that can be used with list_drawings and remove_drawing.",
+    schema: drawCircleSchema,
+  },
+);
+
+const drawRectangleSchema = z.object({
+  west: z.number().describe("Western longitude in decimal degrees"),
+  south: z.number().describe("Southern latitude in decimal degrees"),
+  east: z.number().describe("Eastern longitude in decimal degrees"),
+  north: z.number().describe("Northern latitude in decimal degrees"),
+  color: z.string().optional().describe("CSS color (e.g. '#ff9500', 'red'); defaults to orange"),
+});
 
 /** Draw a filled rectangle (geodetic bounding box) on the Cesium globe. */
-const drawRectangle: AgentTool = {
-  name: "draw_rectangle",
-  description:
-    "Draw a filled rectangle on the Cesium 3D globe from a geodetic bounding box. " +
-    "Provide the west, south, east, and north edges in decimal degrees " +
-    "(edges may be given in any order; they are normalized). " +
-    "Optionally specify a fill/outline color as a CSS color string (e.g. '#ff9500', 'red'). " +
-    "Shapes persist on the globe and each is assigned an id (returned in the result) " +
-    "that can be used with list_drawings and remove_drawing.",
-  parameters: Type.Object({
-    west: Type.Number({ description: "Western longitude in decimal degrees" }),
-    south: Type.Number({ description: "Southern latitude in decimal degrees" }),
-    east: Type.Number({ description: "Eastern longitude in decimal degrees" }),
-    north: Type.Number({ description: "Northern latitude in decimal degrees" }),
-    color: Type.Optional(
-      Type.String({ description: "CSS color (e.g. '#ff9500', 'red'); defaults to orange" }),
-    ),
-  }),
-  execute: (args: Record<string, unknown>) => {
-    let west = Number(args.west);
-    let south = Number(args.south);
-    let east = Number(args.east);
-    let north = Number(args.north);
+const drawRectangle = tool(
+  (args: z.output<typeof drawRectangleSchema>) => {
+    let west = args.west;
+    let south = args.south;
+    let east = args.east;
+    let north = args.north;
     const colorStr = resolveColor(args.color);
 
     if (![west, south, east, north].every(Number.isFinite)) {
-      return `Invalid bounds: ${JSON.stringify({ west: args.west, south: args.south, east: args.east, north: args.north })}. All must be finite numbers.`;
+      return `Invalid bounds: ${JSON.stringify({ west, south, east, north })}. All must be finite numbers.`;
     }
     if (west < -180 || west > 180 || east < -180 || east > 180) {
       return `Invalid longitude bounds (west=${west}, east=${east}). Provide values in [-180, 180].`;
@@ -283,18 +275,22 @@ const drawRectangle: AgentTool = {
       return `draw_rectangle failed: ${err instanceof Error ? err.message : String(err)}`;
     }
   },
-};
+  {
+    name: "draw_rectangle",
+    description:
+      "Draw a filled rectangle on the Cesium 3D globe from a geodetic bounding box. " +
+      "Provide the west, south, east, and north edges in decimal degrees " +
+      "(edges may be given in any order; they are normalized). " +
+      "Optionally specify a fill/outline color as a CSS color string (e.g. '#ff9500', 'red'). " +
+      "Shapes persist on the globe and each is assigned an id (returned in the result) " +
+      "that can be used with list_drawings and remove_drawing.",
+    schema: drawRectangleSchema,
+  },
+);
 
 /** List every circle and rectangle currently drawn on the Cesium globe. */
-const listDrawings: AgentTool = {
-  name: "list_drawings",
-  description:
-    "List all circles and rectangles currently drawn on the Cesium globe, " +
-    "each with its id, type, and geometry. Use the returned id with remove_drawing " +
-    "to delete a single shape, or clear_drawings to remove all of them. " +
-    "Takes no parameters.",
-  parameters: Type.Object({}),
-  execute: () => {
+const listDrawings = tool(
+  () => {
     const viewer = getViewer();
     if (
       !drawingsSource ||
@@ -310,20 +306,20 @@ const listDrawings: AgentTool = {
     }
     return lines.join("\n");
   },
-};
+  {
+    name: "list_drawings",
+    description:
+      "List all circles and rectangles currently drawn on the Cesium globe, " +
+      "each with its id, type, and geometry. Use the returned id with remove_drawing " +
+      "to delete a single shape, or clear_drawings to remove all of them. " +
+      "Takes no parameters.",
+    schema: z.object({}),
+  },
+);
 
 /** Remove a single drawn shape (circle or rectangle) by its id. */
-const removeDrawing: AgentTool = {
-  name: "remove_drawing",
-  description:
-    "Remove a single shape (circle or rectangle) from the Cesium globe by its id. " +
-    "Use list_drawings to find the id of the shape to remove. " +
-    "To remove all shapes at once, use clear_drawings instead.",
-  parameters: Type.Object({
-    id: Type.String({ description: "The id of the shape to remove (from list_drawings)" }),
-  }),
-  execute: (args: Record<string, unknown>) => {
-    const id = typeof args.id === "string" ? args.id : String(args.id);
+const removeDrawing = tool(
+  ({ id }: { id: string }) => {
     const viewer = getViewer();
     if (!drawingsSource || !viewer || !viewer.dataSources.contains(drawingsSource)) {
       return `No shapes on the globe; cannot remove "${id}".`;
@@ -339,16 +335,21 @@ const removeDrawing: AgentTool = {
       return `remove_drawing failed: ${err instanceof Error ? err.message : String(err)}`;
     }
   },
-};
+  {
+    name: "remove_drawing",
+    description:
+      "Remove a single shape (circle or rectangle) from the Cesium globe by its id. " +
+      "Use list_drawings to find the id of the shape to remove. " +
+      "To remove all shapes at once, use clear_drawings instead.",
+    schema: z.object({
+      id: z.string().describe("The id of the shape to remove (from list_drawings)"),
+    }),
+  },
+);
 
 /** Remove every circle and rectangle drawn by the draw_* tools. */
-const clearDrawings: AgentTool = {
-  name: "clear_drawings",
-  description:
-    "Remove every circle and rectangle previously drawn on the Cesium globe " +
-    "by the draw_circle and draw_rectangle tools. Takes no parameters.",
-  parameters: Type.Object({}),
-  execute: () => {
+const clearDrawings = tool(
+  () => {
     const viewer = getViewer();
     if (!drawingsSource || !viewer || !viewer.dataSources.contains(drawingsSource)) {
       return "No shapes to clear.";
@@ -361,10 +362,17 @@ const clearDrawings: AgentTool = {
       return `clear_drawings failed: ${err instanceof Error ? err.message : String(err)}`;
     }
   },
-};
+  {
+    name: "clear_drawings",
+    description:
+      "Remove every circle and rectangle previously drawn on the Cesium globe " +
+      "by the draw_circle and draw_rectangle tools. Takes no parameters.",
+    schema: z.object({}),
+  },
+);
 
 /** Registry of client-side tools available to the agent. */
-export const tools: AgentTool[] = [
+export const tools = [
   getCurrentTime,
   flyTo,
   getCameraInfo,
