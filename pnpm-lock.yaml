@@ -25,13 +25,13 @@ importers:
     dependencies:
       '@hono/node-server':
         specifier: ^2.0.10
-        version: 2.0.10(hono@4.12.31)
+        version: 2.0.10(hono@4.13.5)
       '@web-agent/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       hono:
-        specifier: ^4.12.31
-        version: 4.12.31
+        specifier: ^4.13.5
+        version: 4.13.5
       openai:
         specifier: ^6.48.0
         version: 6.48.0
@@ -361,6 +361,12 @@ packages:
   '@moonrepo/cli@2.4.5':
     resolution: {integrity: sha512-AYdIBRpdTwhzfDgGcFzHexiIMEDxiQoUUmlwcajA64NaLglFM3D4pRv5ZmbR1cK+qMm+szwYCK6lnFJ1l57hOw==}
     hasBin: true
+
+  '@moonrepo/core-linux-arm64-gnu@2.4.5':
+    resolution: {integrity: sha512-pvcANFo5cYvRlT4pFkwd3qaB536mLoTkaXH+PQeGj+Ox0be3Nfk3xZ9tlisD/OENLsy17vLHifqbJaRY28kkTQ==}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
 
   '@moonrepo/core-linux-arm64-musl@2.4.5':
     resolution: {integrity: sha512-s+HIrTMgUt6ekQSmOSJRzDguTxWWYmceMZOGe01wEx6U5a/cka8qJKWjKet2Wgs3sub0GGHguLZcCCVyPW79LA==}
@@ -1256,8 +1262,8 @@ packages:
     resolution: {integrity: sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==}
     hasBin: true
 
-  hono@4.12.31:
-    resolution: {integrity: sha512-zJIHFrl6bq3RDd2YusFNCDlM8qUprxKswyi/OPzPyzKDdyBXDqWx8bZlZ7R+saTdSTatUmb3O7K4SspGPaEOQg==}
+  hono@4.13.5:
+    resolution: {integrity: sha512-O6+/eCYRkzzzy0rPWwKLiGBR1nFuUPZynnwjxN1MBA62NNqbT0wQEzQyK2gSO5yDIDB336sXQleAhOHrzlYyKw==}
     engines: {node: '>=16.9.0'}
 
   hookable@5.5.3:
@@ -1955,9 +1961,9 @@ snapshots:
   '@esbuild/win32-x64@0.28.1':
     optional: true
 
-  '@hono/node-server@2.0.10(hono@4.12.31)':
+  '@hono/node-server@2.0.10(hono@4.13.5)':
     dependencies:
-      hono: 4.12.31
+      hono: 4.13.5
 
   '@jridgewell/gen-mapping@0.3.12':
     dependencies:
@@ -1998,12 +2004,16 @@ snapshots:
     dependencies:
       detect-libc: 2.1.2
     optionalDependencies:
+      '@moonrepo/core-linux-arm64-gnu': 2.4.5
       '@moonrepo/core-linux-arm64-musl': 2.4.5
       '@moonrepo/core-linux-x64-gnu': 2.4.5
       '@moonrepo/core-linux-x64-musl': 2.4.5
       '@moonrepo/core-macos-arm64': 2.4.5
       '@moonrepo/core-macos-x64': 2.4.5
       '@moonrepo/core-windows-x64-msvc': 2.4.5
+
+  '@moonrepo/core-linux-arm64-gnu@2.4.5':
+    optional: true
 
   '@moonrepo/core-linux-arm64-musl@2.4.5':
     optional: true
@@ -2651,7 +2661,7 @@ snapshots:
 
   he@1.2.0: {}
 
-  hono@4.12.31: {}
+  hono@4.13.5: {}
 
   hookable@5.5.3: {}
 
